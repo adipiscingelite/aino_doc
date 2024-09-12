@@ -36,3 +36,9 @@ type Forms struct {
 	Deleted_by   sql.NullString `json:"deleted_by" db:"deleted_by"`
 	Deleted_at   sql.NullTime   `json:"deleted_at" db:"deleted_at"`
 }
+
+type FormPublish struct {
+	FormUUID     string         `json:"form_uuid" db:"form_uuid"`
+	FormStatus   string         `json:"form_status" db:"form_status"`
+
+}

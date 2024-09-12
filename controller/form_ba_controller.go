@@ -99,6 +99,8 @@ func AddBA(c echo.Context) error {
 	fmt.Println("User ID:", userID)
 	fmt.Println("User Name:", userName)
 	fmt.Println("Division Code:", divisionCode)
+	fmt.Println("tes")
+
 	// Lakukan validasi token
 	if userID == 0 && userName == "" {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
@@ -149,6 +151,21 @@ func AddBA(c echo.Context) error {
 	}
 }
 
+func GetBACode(c echo.Context) error {
+	documentCode, err := service.GetBACode()
+	if err != nil {
+		log.Print(err)
+		response := models.Response{
+			Code:    500,
+			Message: "Terjadi kesalahan internal server. Mohon coba beberapa saat lagi",
+			Status:  false,
+		}
+		return c.JSON(http.StatusInternalServerError, response)
+	}
+
+	return c.JSON(http.StatusOK, documentCode)
+}
+
 func GetAllFormBA(c echo.Context) error {
 	form, err := service.GetAllFormBA()
 	if err != nil {
@@ -194,9 +211,7 @@ func GetSpecBA(c echo.Context) error {
 func GetSpecAllBA(c echo.Context) error {
 	id := c.Param("id")
 
-	var getDoc []models.FormsBAAll
-
-	getDoc, err := service.GetSpecAllBA(id)
+	formBAWithSignatories, err := service.GetSpecAllBA(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Print(err)
@@ -216,7 +231,13 @@ func GetSpecAllBA(c echo.Context) error {
 		}
 	}
 
-	return c.JSON(http.StatusOK, getDoc)
+	// Siapkan data respons
+	responseData := map[string]interface{}{
+		"form":        formBAWithSignatories.Form,
+		"signatories": formBAWithSignatories.Signatories,
+		// "signatories": formBAWithSignatories.Signatories,
+	}
+	return c.JSON(http.StatusOK, responseData)
 }
 
 // menampilkan form dari user/ milik dia sendiri
@@ -353,9 +374,10 @@ func UpdateFormBA(c echo.Context) error {
 	id := c.Param("id")
 
 	var updateFormRequest struct {
-		IsPublished bool        `json:"isPublished"`
-		FormData    models.Form `json:"formData"`
-		BA          models.BA   `json:"data_ba"`
+		IsPublished bool               `json:"isPublished"`
+		FormData    models.Form        `json:"formData"`
+		Signatory   []models.Signatory `json:"signatories"`
+		BA          models.BA          `json:"data_ba"`
 	}
 	if err := c.Bind(&updateFormRequest); err != nil {
 		log.Print("error saat binding:", err)
@@ -493,7 +515,7 @@ func UpdateFormBA(c echo.Context) error {
 		})
 	}
 
-	_, errService := service.UpdateBA(updateFormRequest.FormData, updateFormRequest.BA, userName, userID, updateFormRequest.IsPublished, id)
+	_, errService := service.UpdateBA(updateFormRequest.FormData, updateFormRequest.BA, userName, userID, updateFormRequest.IsPublished, id, updateFormRequest.Signatory)
 	if errService != nil {
 		log.Println("Kesalahan selama pembaruan:", errService)
 		if errService.Error() == "You are not authorized to update this form" {
@@ -517,6 +539,98 @@ func UpdateFormBA(c echo.Context) error {
 		Message: "Formulir Berita Acara berhasil diperbarui!",
 		Status:  true,
 	})
+}
+
+func FormBAByDivision(c echo.Context) error {
+
+	tokenString := c.Request().Header.Get("Authorization")
+	secretKey := "secretJwToken"
+
+	if tokenString == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	// Periksa apakah tokenString mengandung "Bearer "
+	if !strings.HasPrefix(tokenString, "Bearer ") {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	// Hapus "Bearer " dari tokenString
+	tokenOnly := strings.TrimPrefix(tokenString, "Bearer ")
+
+	//dekripsi token JWE
+	decrypted, err := DecryptJWE(tokenOnly, secretKey)
+	if err != nil {
+		fmt.Println("Gagal mendekripsi token:", err)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	var claims JwtCustomClaims
+	errJ := json.Unmarshal([]byte(decrypted), &claims)
+	if errJ != nil {
+		fmt.Println("Gagal mengurai klaim:", errJ)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	userID, ok := c.Get("user_id").(int)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "User ID tidak ditemukan!",
+			"status":  false,
+		})
+	}
+	fmt.Println("User ID :", userID)
+
+	c.Set("division_code", claims.DivisionCode)
+	divisionCode, ok := c.Get("division_code").(string)
+	if !ok {
+		// fmt.Println("Division Code is not set or invalid type")
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Division Code tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	fmt.Println("Division Code :", divisionCode)
+
+	myform, err := service.FormBAByDivision(divisionCode)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Print(err)
+			response := models.Response{
+				Code:    404,
+				Message: "Form tidak ditemukan!",
+				Status:  false,
+			}
+			return c.JSON(http.StatusNotFound, response)
+		} else {
+			log.Print(err)
+			return c.JSON(http.StatusInternalServerError, &models.Response{
+				Code:    500,
+				Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
+				Status:  false,
+			})
+		}
+	}
+	return c.JSON(http.StatusOK, myform)
 }
 
 // menampilkan form dari user/ milik dia sendiri

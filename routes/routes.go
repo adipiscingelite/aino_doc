@@ -46,6 +46,10 @@ func Route() *echo.Echo {
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(middleware.AdminMiddleware)
 	adminGroup.GET("/my/form/division", controller.FormByDivision)
+	adminGroup.GET("/my/itcm/division", controller.FormITCMByDivision)
+	adminGroup.GET("/my/da/division", controller.FormDAByDivision)
+	adminGroup.GET("/my/ba/division", controller.FormBAByDivision)
+	adminGroup.GET("/my/ha/division", controller.FormHAByDivision)
 
 	//document
 	e.GET("/document", controller.GetAllDoc)
@@ -63,6 +67,7 @@ func Route() *echo.Echo {
 
 	//tandatangan
 	e.GET("/signatory/:id", controller.GetSpecSignatureByID)
+	// buat true false
 	adminMember.PUT("/signature/update/:id", controller.UpdateSignature)
 	e.GET("/form/signatories/:id", controller.GetSignatureForm)
 	//add informasi signature
@@ -78,12 +83,17 @@ func Route() *echo.Echo {
 	adminMember.GET("/my/signature/ba", controller.SignatureUserBA)
 	//itcm
 	adminMember.GET("/my/signature/itcm", controller.SignatureUserITCM)
+	//ha
+	adminMember.GET("/my/signature/ha", controller.SignatureUserHA)
 
 	//add approval
 	adminMember.PUT("/form/approval/:id", controller.AddApproval)
+	//add approval
+	adminMember.PUT("/form/da/approval/:id", controller.AddApprovalDA)
 
 	//FORM itcm
 	adminMember.POST("/add/itcm", controller.AddITCM)
+	e.GET("/form/itcm/code", controller.GetITCMCode)
 	e.GET("/form/itcm", controller.GetAllFormITCM)
 	e.GET("/form/itcm/:id", controller.GetSpecITCM)
 	e.GET("/itcm/:id", controller.GetSpecAllITCM)
@@ -93,6 +103,7 @@ func Route() *echo.Echo {
 
 	//form BA
 	adminMember.POST("/add/ba", controller.AddBA)
+	e.GET("/form/ba/code", controller.GetBACode)
 	e.GET("/form/ba", controller.GetAllFormBA)
 	e.GET("/form/ba/:id", controller.GetSpecBA)
 	e.GET("/ba/:id", controller.GetSpecAllBA)
@@ -113,11 +124,14 @@ func Route() *echo.Echo {
 
 	//form hak akses
 	adminMember.POST("/add/ha", controller.AddHA)
+	e.GET("/form/ha/code", controller.GetHACode)
 	e.GET("/hak/akses", controller.GetAllFormHA)
+	// e.GET("/form/ha/:id", controller.GetSpecHA)
 	e.GET("/ha/:id", controller.GetSpecAllHA)
 	adminMember.PUT("/hak/akses/update/:id", controller.UpdateHakAkses)
-	adminMember.GET("/ha/all", controller.GetAllFormHAAdmin)
 	adminMember.GET("/my/form/ha", controller.MyFormsHA)
+	adminGroup.GET("/ha/all", controller.GetAllFormHAAdmin)
+	// adminMember.PUT("/ha/publish/:id", controller.PublishHA)
 
 	//product
 	e.GET("/product", controller.GetAllProduct)

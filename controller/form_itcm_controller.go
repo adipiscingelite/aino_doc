@@ -138,6 +138,21 @@ func AddITCM(c echo.Context) error {
 
 }
 
+func GetITCMCode(c echo.Context) error {
+	documentCode, err := service.GetITCMCode()
+	if err != nil {
+		log.Print(err)
+		response := models.Response{
+			Code:    500,
+			Message: "Terjadi kesalahan internal server. Mohon coba beberapa saat lagi",
+			Status:  false,
+		}
+		return c.JSON(http.StatusInternalServerError, response)
+	}
+
+	return c.JSON(http.StatusOK, documentCode)
+}
+
 // menampilkan form tanpa token
 func GetAllFormITCM(c echo.Context) error {
 	form, err := service.GetAllFormITCM()
@@ -315,9 +330,9 @@ func GetSpecITCM(c echo.Context) error {
 func GetSpecAllITCM(c echo.Context) error {
 	id := c.Param("id")
 
-	var getDoc []models.FormITCMAll
+	// var getDoc []models.FormITCMAll
 
-	getDoc, err := service.GetSpecAllITCM(id)
+	formITCMWithSignatories, err := service.GetSpecAllITCM(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Print(err)
@@ -337,7 +352,13 @@ func GetSpecAllITCM(c echo.Context) error {
 		}
 	}
 
-	return c.JSON(http.StatusOK, getDoc)
+	// Siapkan data respons
+	responseData := map[string]interface{}{
+		"form":        formITCMWithSignatories.Form,
+		"signatories": formITCMWithSignatories.Signatories,
+		// "signatories": formITCMWithSignatories.Signatories,
+	}
+	return c.JSON(http.StatusOK, responseData)
 }
 
 func DetailITCM(c echo.Context) error {
@@ -382,9 +403,10 @@ func UpdateFormITCM(c echo.Context) error {
 	id := c.Param("id")
 
 	var updateFormRequest struct {
-		IsPublished bool        `json:"isPublished"`
-		FormData    models.Form `json:"formData"`
-		ITCM        models.ITCM `json:"data_itcm"` // Tambahkan ITCM ke dalam struct request
+		IsPublished bool               `json:"isPublished"`
+		FormData    models.Form        `json:"formData"`
+		Signatory   []models.Signatory `json:"signatories"`
+		ITCM        models.ITCM        `json:"data_itcm"` // Tambahkan ITCM ke dalam struct request
 	}
 
 	if err := c.Bind(&updateFormRequest); err != nil {
@@ -525,7 +547,7 @@ func UpdateFormITCM(c echo.Context) error {
 		})
 	}
 
-	_, errService := service.UpdateFormITCM(updateFormRequest.FormData, updateFormRequest.ITCM, userName, userID, updateFormRequest.IsPublished, id)
+	_, errService := service.UpdateFormITCM(updateFormRequest.FormData, updateFormRequest.ITCM, userName, userID, updateFormRequest.IsPublished, id, updateFormRequest.Signatory)
 	if errService != nil {
 		log.Println("Kesalahan selama pembaruan:", errService)
 		if errService.Error() == "You are not authorized to update this form" {
@@ -549,6 +571,98 @@ func UpdateFormITCM(c echo.Context) error {
 		Message: "Formulir ITCM berhasil diperbarui!",
 		Status:  true,
 	})
+}
+
+func FormITCMByDivision(c echo.Context) error {
+
+	tokenString := c.Request().Header.Get("Authorization")
+	secretKey := "secretJwToken"
+
+	if tokenString == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	// Periksa apakah tokenString mengandung "Bearer "
+	if !strings.HasPrefix(tokenString, "Bearer ") {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	// Hapus "Bearer " dari tokenString
+	tokenOnly := strings.TrimPrefix(tokenString, "Bearer ")
+
+	//dekripsi token JWE
+	decrypted, err := DecryptJWE(tokenOnly, secretKey)
+	if err != nil {
+		fmt.Println("Gagal mendekripsi token:", err)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	var claims JwtCustomClaims
+	errJ := json.Unmarshal([]byte(decrypted), &claims)
+	if errJ != nil {
+		fmt.Println("Gagal mengurai klaim:", errJ)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	userID, ok := c.Get("user_id").(int)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "User ID tidak ditemukan!",
+			"status":  false,
+		})
+	}
+	fmt.Println("User ID :", userID)
+
+	c.Set("division_code", claims.DivisionCode)
+	divisionCode, ok := c.Get("division_code").(string)
+	if !ok {
+		// fmt.Println("Division Code is not set or invalid type")
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Division Code tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	fmt.Println("Division Code :", divisionCode)
+
+	myform, err := service.FormITCMByDivision(divisionCode)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Print(err)
+			response := models.Response{
+				Code:    404,
+				Message: "Form tidak ditemukan!",
+				Status:  false,
+			}
+			return c.JSON(http.StatusNotFound, response)
+		} else {
+			log.Print(err)
+			return c.JSON(http.StatusInternalServerError, &models.Response{
+				Code:    500,
+				Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
+				Status:  false,
+			})
+		}
+	}
+	return c.JSON(http.StatusOK, myform)
 }
 
 func SignatureUserITCM(c echo.Context) error {

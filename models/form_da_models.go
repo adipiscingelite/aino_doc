@@ -7,6 +7,7 @@ import (
 
 type DampakAnalisa struct {
 	//NamaProyek                           string    `json:"nama_proyek"`
+	FormITCMID                           string `json:"itcm_form_uuid"`
 	NamaAnalis                           string `json:"nama_analis"`
 	Jabatan                              string `json:"jabatan"`
 	Departemen                           string `json:"departemen"`

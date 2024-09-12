@@ -32,21 +32,25 @@ type AddInfoHA struct {
 }
 
 type FormsHA struct {
-	FormUUID     string         `json:"form_uuid" db:"form_uuid"`
-	DocumentName string         `json:"document_name" db:"document_name"`
-	FormName     string         `json:"form_name" db:"form_name"`
-	FormStatus   string         `json:"form_status" db:"form_status"`
-	CreatedBy    string         `json:"created_by" db:"created_by"`
-	CreatedAt    time.Time      `json:"created_at" db:"created_at"`
-	UpdatedBy    sql.NullString `json:"updated_by" db:"updated_by"`
-	UpdatedAt    sql.NullTime   `json:"updated_at" db:"updated_at"`
-	DeletedBy    sql.NullString `json:"deleted_by" db:"deleted_by"`
-	DeletedAt    sql.NullTime   `json:"deleted_at" db:"deleted_at"`
+	FormUUID       string         `json:"form_uuid" db:"form_uuid"`
+	FormNumber     string         `json:"form_number" db:"form_number"`
+	FormTicket     string         `json:"form_ticket" db:"form_ticket"`
+	DocumentName   string         `json:"document_name" db:"document_name"`
+	FormName       string         `json:"form_name" db:"form_name"`
+	FormStatus     string         `json:"form_status" db:"form_status"`
+	CreatedBy      string         `json:"created_by" db:"created_by"`
+	CreatedAt      time.Time      `json:"created_at" db:"created_at"`
+	UpdatedBy      sql.NullString `json:"updated_by" db:"updated_by"`
+	UpdatedAt      sql.NullTime   `json:"updated_at" db:"updated_at"`
+	DeletedBy      sql.NullString `json:"deleted_by" db:"deleted_by"`
+	DeletedAt      sql.NullTime   `json:"deleted_at" db:"deleted_at"`
+	ApprovalStatus string         `json:"approval_status" db:"approval_status"`
+	Reason         sql.NullString `json:"reason" db:"reason"` // tambahkan field ini
 }
 
 type HA struct {
 	FormName string `json:"form_name" db:"form_name"`
-}
+}	
 type FormsHAAll struct {
 	FormUUID      string         `json:"form_uuid" db:"form_uuid"`
 	FormStatus    string         `json:"form_status" db:"form_status"`

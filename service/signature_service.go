@@ -1,9 +1,10 @@
 package service
 
 import (
-	"database/sql"
+	// "database/sql"
 	"document/models"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -99,28 +100,38 @@ func UpdateFormSignature(updateSign models.UpdateSign, id string, username strin
 	return nil
 }
 
-// ga kepake
-func GetUserRoleFromDatabase(userID int) (string, error) {
-	var role string
-	err := db.QueryRow("SELECT role_sign FROM sign_form WHERE user_id = $1", userID).Scan(&role)
+// ga kepake, tp ku edit bjir
+func GetUserRoleByFormID(userID int, formUUID string) (string, error) {
+	var roleSign string
+	query := `
+		SELECT sf.role_sign
+		FROM sign_form sf
+		JOIN form_ms f ON sf.form_id = f.form_id
+		WHERE sf.user_id = $1 AND f.form_uuid = $2
+		LIMIT 1
+	`
+	err := db.Get(&roleSign, query, userID, formUUID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", errors.New("Pengguna tidak ditemukan")
-		}
 		return "", err
 	}
-	return role, nil
+	return roleSign, nil
 }
 
 func AddApproval(addApproval models.AddApproval, id string, username string, userID int) error {
-	// //userRole, err := GetUserRoleFromDatabase(userID)
-	// if err != nil {
-	// 	return err
-	// }
+	// Ambil role_sign dari database
+	userRole, err := GetUserRoleByFormID(userID, id)
+	if err != nil {
+		return err
+	}
 
 	// Periksa apakah peran pengguna adalah "Atasan Penerima"
+	if userRole != "Atasan Penerima" || userRole == "" {
+		return fmt.Errorf("hanya 'Atasan Penerima' yang dapat menyetujui atau menolak form")
+	}
+
+	// Lanjutkan dengan pembaruan form jika role_sign valid
 	currentTime := time.Now()
-	_, err := db.NamedExec("UPDATE form_ms SET is_approve = :is_approve, reason = :reason, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id", map[string]interface{}{
+	_, err = db.NamedExec("UPDATE form_ms SET is_approve = :is_approve, reason = :reason, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id", map[string]interface{}{
 		"is_approve": addApproval.IsApproval,
 		"reason":     addApproval.Reason,
 		"updated_by": username,
@@ -131,7 +142,97 @@ func AddApproval(addApproval models.AddApproval, id string, username string, use
 		return err
 	}
 	return nil
+}
 
+// sekalian agar nomor da auto masuk ke form itcm
+func AddApprovalDA(addApproval models.AddApproval, id string, username string, userID int) error {
+	// Ambil role_sign dari database
+	userRole, err := GetUserRoleByFormID(userID, id)
+	if err != nil {
+		return err
+	}
+
+	// Periksa apakah peran pengguna adalah "Atasan Penerima"
+	if userRole != "Atasan Penerima" || userRole == "" {
+		return fmt.Errorf("hanya 'Atasan Penerima' yang dapat menyetujui atau menolak form")
+	}
+
+	// Query untuk mengambil form_id berdasarkan id yang diberikan
+	var formDAID string
+	err = db.QueryRow(`
+        SELECT form_id
+        FROM form_ms
+        WHERE form_uuid = $1
+    `, id).Scan(&formDAID)
+
+	if err != nil {
+		return err
+	}
+
+	// Ambil itcm_form_uuid dari database
+	var itcmFormUUID string
+	err = db.QueryRow(`
+    SELECT 
+        (f.form_data->>'itcm_form_uuid')::text AS itcm_form_uuid
+    FROM form_ms f
+    LEFT JOIN document_ms d ON f.document_id = d.document_id
+    WHERE f.form_uuid = $1 AND d.document_code = 'DA'
+`, id).Scan(&itcmFormUUID)
+	if err != nil {
+		return err
+	}
+
+	// ambil form_id milik itcm berdasarkan itcmFormUUID
+	var formITCMID string
+	err = db.QueryRow(`
+			SELECT form_id
+			FROM form_ms
+			WHERE form_uuid = $1
+	`, itcmFormUUID).Scan(&formITCMID)
+	if err != nil {
+		return err
+	}
+
+	var formDANumber string
+	err = db.QueryRow(`
+	SELECT form_number
+	FROM form_ms
+	WHERE form_id = $1
+`, formDAID).Scan(&formDANumber)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ID milik DA", formDAID)
+	fmt.Println("UUID milik ITCM", itcmFormUUID)
+	fmt.Println("ID milik ITCM", formITCMID)
+	fmt.Println("number milik da", formDANumber)
+
+	// Pastikan nilai `IsApproval` sudah didefinisikan dalam `addApproval`
+	if addApproval.IsApproval {
+		_, err := db.Exec(`
+		UPDATE form_ms 
+		SET form_data = JSONB_SET(form_data, '{no_da}', to_jsonb($1::text))
+		WHERE form_id = $2;
+	`, formDANumber, formITCMID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Lanjutkan dengan pembaruan form jika role_sign valid
+	currentTime := time.Now()
+	_, err = db.NamedExec("UPDATE form_ms SET is_approve = :is_approve, reason = :reason, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id", map[string]interface{}{
+		"is_approve": addApproval.IsApproval,
+		"reason":     addApproval.Reason,
+		"updated_by": username,
+		"updated_at": currentTime,
+		"id":         id,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func UpdateSignInfo(signatory models.UpdateSignForm, id string, username string) (models.UpdateSignForm, error) {

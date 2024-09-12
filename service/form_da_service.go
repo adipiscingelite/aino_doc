@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func generateFormNumberDA(documentID int64, recursionCount int) (string, error) {
+func generateFormNumberDA(documentID int64, divisionCode string, recursionCount int) (string, error) {
 	const maxRecursionCount = 1000
 
 	// Check if the maximum recursion count is reached
@@ -20,9 +20,14 @@ func generateFormNumberDA(documentID int64, recursionCount int) (string, error) 
 		return "", errors.New("Maximum recursion count exceeded")
 	}
 
+	documentCode, err := GetDocumentCode(documentID)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get document code: %v", err)
+	}
+
 	// Get the latest form number for the given document ID
 	var latestFormNumber sql.NullString
-	err := db.Get(&latestFormNumber, "SELECT MAX(form_number) FROM form_ms WHERE document_id = $1", documentID)
+	err = db.Get(&latestFormNumber, "SELECT MAX(form_number) FROM form_ms WHERE document_id = $1", documentID)
 	if err != nil {
 		return "", fmt.Errorf("Error getting latest form number: %v", err)
 	}
@@ -52,7 +57,8 @@ func generateFormNumberDA(documentID int64, recursionCount int) (string, error) 
 
 	// Format the form number according to the specified format
 	formNumberString := fmt.Sprintf("%04d", formNumber)
-	formNumberWithDivision := fmt.Sprintf("%s/%s/%s/%s/%d", formNumberString, "PED", "F", romanMonth, year)
+	formNumberWithDivision := fmt.Sprintf("%s/%s/%s/%s/%d", formNumberString, divisionCode, documentCode, romanMonth, year)
+	// formNumberWithDivision := fmt.Sprintf("%s/%s/%s/%s/%d", formNumberString, "PED", "F", romanMonth, year)
 
 	var count int
 	err = db.Get(&count, "SELECT COUNT(*) FROM form_ms WHERE form_number = $1 and document_id = $2", formNumberString, documentID)
@@ -61,7 +67,7 @@ func generateFormNumberDA(documentID int64, recursionCount int) (string, error) 
 	}
 	if count > 0 {
 		// If the form number already exists, recursively call the function again
-		return generateFormNumberDA(documentID, recursionCount+1)
+		return generateFormNumberDA(documentID, divisionCode, recursionCount+1)
 	}
 
 	return formNumberWithDivision, nil
@@ -101,7 +107,7 @@ func AddDA(addDA models.Form, isPublished bool, username string, userID int, div
 		return err
 	}
 	// Generate form number based on document code
-	formNumberDA, err := generateFormNumberDA(documentID, recrusionCount+1)
+	formNumberDA, err := generateFormNumberDA(documentID, divisionCode, recrusionCount+1)
 	if err != nil {
 		// Handle error
 		log.Println("Error generating form number:", err)
@@ -140,6 +146,7 @@ func AddDA(addDA models.Form, isPublished bool, username string, userID int, div
 	for _, signatory := range signatories {
 		uuidString := uuid.New().String()
 
+		log.Printf("Processing signatory: %+v\n", signatory)
 		// Mencari user_id yang sesuai dengan personal_name yang dipilih
 		var userID string
 		for _, personal := range personalNames {
@@ -501,6 +508,7 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
                 WHEN f.is_approve = false THEN 'Tidak Disetujui'
                 WHEN f.is_approve = true THEN 'Disetujui'
             END AS ApprovalStatus,
+						f.reason,  
             f.created_by,
             f.created_at,
             f.updated_by,
@@ -535,7 +543,8 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
             name AS signatory_name,
             position AS signatory_position,
             role_sign,
-            is_sign
+            is_sign,
+						updated_at
         FROM
             sign_form
         WHERE
@@ -594,41 +603,136 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
 // 	return signatories, nil
 //}
 
-func UpdateFormDA(updateDA models.Form, data models.DampakAnalisa, username string, userID int, isPublished bool, id string) (models.Form, error) {
+func UpdateFormDA(updateDA models.Form, data models.DampakAnalisa, username string, userID int, isPublished bool, id string, signatories []models.Signatory) (models.Form, error) {
 	currentTime := time.Now()
 	formStatus := "Draft"
 	if isPublished {
-		formStatus = "Published"
+			formStatus = "Published"
 	}
 
 	var projectID int64
 	err := db.Get(&projectID, "SELECT project_id FROM project_ms WHERE project_uuid = $1", updateDA.ProjectUUID)
 	if err != nil {
-		log.Println("Error getting project_id:", err)
-		return models.Form{}, err
+			log.Println("Error getting project_id:", err)
+			return models.Form{}, err
 	}
 
 	daJSON, err := json.Marshal(data)
 	if err != nil {
-		log.Println("Error marshaling DampakAnalisa struct:", err)
-		return models.Form{}, err
+			log.Println("Error marshaling DampakAnalisa struct:", err)
+			return models.Form{}, err
 	}
-	log.Println("DampakAnalisa JSON:", string(daJSON)) // Periksa hasil marshaling
 
-	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id,  form_ticket = :form_ticket, form_status = :form_status, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id AND form_status = 'Draft'", map[string]interface{}{
-		"user_id":     userID,
-		"form_ticket": updateDA.FormTicket,
-		"project_id":  projectID,
-		"form_status": formStatus,
-		"form_data":   daJSON,
-		"updated_by":  username,
-		"updated_at":  currentTime,
-		"id":          id,
+	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id, form_ticket = :form_ticket, form_status = :form_status, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id AND form_status = 'Draft'", map[string]interface{}{
+			"user_id":     userID,
+			"form_ticket": updateDA.FormTicket,
+			"project_id":  projectID,
+			"form_status": formStatus,
+			"form_data":   daJSON,
+			"updated_by":  username,
+			"updated_at":  currentTime,
+			"id":          id,
 	})
 	if err != nil {
-		return models.Form{}, err
+			return models.Form{}, err
 	}
+
+	var formID string
+	err = db.Get(&formID, "SELECT form_id FROM form_ms WHERE form_uuid = $1", id)
+	if err != nil {
+			log.Println("Error getting form_id:", err)
+			return models.Form{}, err
+	}
+
+	_, err = db.Exec("DELETE FROM sign_form WHERE form_id = $1", formID)
+	if err != nil {
+			log.Println("Error deleting sign_form records:", err)
+			return models.Form{}, err
+	}
+
+	personalNames, err := GetAllPersonalName()
+	if err != nil {
+			log.Println("Error getting personal names:", err)
+			return models.Form{}, err
+	}
+
+	for _, signatory := range signatories {
+			uuidString := uuid.New().String()
+
+			log.Printf("Processing signatory: %+v\n", signatory)
+			var userID string
+			for _, personal := range personalNames {
+					if personal.PersonalName == signatory.Name {
+							userID = personal.UserID
+							break
+					}
+			}
+
+			if userID == "" {
+					log.Printf("User ID not found for personal name: %s\n", signatory.Name)
+					continue
+			}
+
+			_, err := db.NamedExec("INSERT INTO sign_form (sign_uuid, form_id, user_id, name, position, role_sign, created_by) VALUES (:sign_uuid, :form_id, :user_id, :name, :position, :role_sign, :created_by)", map[string]interface{}{
+					"sign_uuid":  uuidString,
+					"user_id":    userID,
+					"form_id":    formID, // Adjusted to use documentID
+					"name":       signatory.Name,
+					"position":   signatory.Position,
+					"role_sign":  signatory.Role,
+					"created_by": username,
+			})
+			if err != nil {
+					return models.Form{}, err
+			}
+	}
+
 	return updateDA, nil
+}
+
+func FormDAByDivision(divisionCode string) ([]models.Formss, error) {
+	var form []models.Formss
+
+	// Now use the retrieved documentID in the query
+	errSelect := db.Select(&form, `
+			SELECT 
+		f.form_uuid, f.form_number, f.form_ticket, f.form_status, 
+		d.document_name,
+		p.project_name,
+		f.reason, f.created_by, f.created_at, f.updated_by, f.updated_at, f.deleted_by, f.deleted_at,
+		(f.form_data->>'nama_analis')::text AS nama_analis,
+		(f.form_data->>'jabatan')::text AS jabatan,
+		(f.form_data->>'departemen')::text AS departemen,
+		(f.form_data->>'jenis_perubahan')::text AS jenis_perubahan,
+		(f.form_data->>'detail_dampak_perubahan')::text AS detail_dampak_perubahan,
+		(f.form_data->>'rencana_pengembangan_perubahan')::text AS rencana_pengembangan_perubahan,
+		(f.form_data->>'rencana_pengujian_perubahan_sistem')::text AS rencana_pengujian_perubahan_sistem,
+		(f.form_data->>'rencana_rilis_perubahan_dan_implementasi')::text AS rencana_rilis_perubahan_dan_implementasi,
+		CASE
+		WHEN f.is_approve IS NULL THEN 'Menunggu Disetujui'
+		WHEN f.is_approve = false THEN 'Tidak Disetujui'
+		WHEN f.is_approve = true THEN 'Disetujui'
+	END AS ApprovalStatus -- Alias the CASE expression as ApprovalStatus
+		FROM 
+		form_ms f
+	LEFT JOIN 
+		document_ms d ON f.document_id = d.document_id
+	LEFT JOIN 
+		project_ms p ON f.project_id = p.project_id
+		WHERE
+		d.document_code = 'DA'  AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
+	`, divisionCode)
+
+	if errSelect != nil {
+		log.Print(errSelect)
+		return nil, errSelect
+	}
+
+	if len(form) == 0 {
+		return nil, sql.ErrNoRows
+	}
+
+	return form, nil
 }
 
 func SignatureUser(userID int) ([]models.Formss, error) {

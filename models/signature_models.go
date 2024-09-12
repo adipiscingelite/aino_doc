@@ -76,9 +76,10 @@ type UserIDSign struct {
 }
 
 type SignatoryHA struct {
-	SignUUID          string `json:"sign_uuid" db:"sign_uuid"`
-	SignatoryName     string `json:"signatory_name" db:"signatory_name"`
-	SignatoryPosition string `json:"signatory_position" db:"signatory_position"`
-	RoleSign          string `json:"role_sign" db:"role_sign"`
-	IsSign            bool   `json:"is_sign" db:"is_sign"`
+	SignUUID          string       `json:"sign_uuid" db:"sign_uuid"`
+	SignatoryName     string       `json:"signatory_name" db:"signatory_name"`
+	SignatoryPosition string       `json:"signatory_position" db:"signatory_position"`
+	RoleSign          string       `json:"role_sign" db:"role_sign"`
+	IsSign            bool         `json:"is_sign" db:"is_sign"`
+	Updated_at        sql.NullTime `json:"updated_at" db:"updated_at"`
 }
