@@ -401,6 +401,8 @@ func UpdateForm(updateForm models.Form, id string, isPublished bool, username st
 		}
 	}
 
+	// fmt.Println("woi", updateForm.FormTicket)
+
 	var existingUserID int
 	errID := db.Get(&existingUserID, "SELECT user_id FROM form_ms WHERE form_uuid = $1", id)
 	if errID != nil {

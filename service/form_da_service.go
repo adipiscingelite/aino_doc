@@ -207,6 +207,7 @@ func GetAllFormDA() ([]models.Formss, error) {
 			project_ms p ON f.project_id = p.project_id
 			WHERE
 			d.document_code = 'DA' AND f.deleted_at IS NULL
+			ORDER BY f.form_number DESC;
 	`)
 	if err != nil {
 		return nil, err
@@ -282,6 +283,7 @@ func GetAllDAbyUserID(userID int) ([]models.Formss, error) {
 		project_ms p ON f.project_id = p.project_id
 		WHERE
 		f.user_id = $1 AND d.document_code = 'DA'  AND f.deleted_at IS NULL
+		ORDER BY f.form_number DESC;
 `, userID)
 	if err != nil {
 		return nil, err
@@ -515,6 +517,7 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
             f.updated_at,
             f.deleted_by,
             f.deleted_at,
+            (f.form_data->>'itcm_form_uuid')::text AS itcm_form_uuid,
             (f.form_data->>'nama_analis')::text AS nama_analis,
             (f.form_data->>'jabatan')::text AS jabatan,
             (f.form_data->>'departemen')::text AS departemen,
@@ -544,6 +547,10 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
             position AS signatory_position,
             role_sign,
             is_sign,
+						CASE
+							WHEN sign_img IS NOT NULL AND sign_img != '' THEN CONCAT('/assets/images/signatures/', sign_img)
+							ELSE ''
+						END AS sign_img,
 						updated_at
         FROM
             sign_form
@@ -603,88 +610,90 @@ func GetSpecAllDAa(id string) (*FormDAWithSignatories, error) {
 // 	return signatories, nil
 //}
 
-func UpdateFormDA(updateDA models.Form, data models.DampakAnalisa, username string, userID int, isPublished bool, id string, signatories []models.Signatory) (models.Form, error) {
+func UpdateFormDA(updateDA models.Form, data models.DampakAnalisa, username string, userID int, id string, signatories []models.Signatory) (models.Form, error) {
 	currentTime := time.Now()
 	formStatus := "Draft"
-	if isPublished {
-			formStatus = "Published"
-	}
+	// approvalStatus := nil
+	// if isPublished {
+	// 		formStatus = "Published"
+	// }
 
 	var projectID int64
 	err := db.Get(&projectID, "SELECT project_id FROM project_ms WHERE project_uuid = $1", updateDA.ProjectUUID)
 	if err != nil {
-			log.Println("Error getting project_id:", err)
-			return models.Form{}, err
+		log.Println("Error getting project_id:", err)
+		return models.Form{}, err
 	}
 
 	daJSON, err := json.Marshal(data)
 	if err != nil {
-			log.Println("Error marshaling DampakAnalisa struct:", err)
-			return models.Form{}, err
+		log.Println("Error marshaling DampakAnalisa struct:", err)
+		return models.Form{}, err
 	}
 
-	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id, form_ticket = :form_ticket, form_status = :form_status, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id AND form_status = 'Draft'", map[string]interface{}{
-			"user_id":     userID,
-			"form_ticket": updateDA.FormTicket,
-			"project_id":  projectID,
-			"form_status": formStatus,
-			"form_data":   daJSON,
-			"updated_by":  username,
-			"updated_at":  currentTime,
-			"id":          id,
+	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id, form_ticket = :form_ticket, project_id = :project_id, form_status = :form_status, is_approve = :is_approve, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id", map[string]interface{}{
+		"user_id":     userID,
+		"form_ticket": updateDA.FormTicket,
+		"project_id":  projectID,
+		"form_status": formStatus,
+		"is_approve": nil,
+		"form_data":   daJSON,
+		"updated_by":  username,
+		"updated_at":  currentTime,
+		"id":          id,
 	})
 	if err != nil {
-			return models.Form{}, err
+		return models.Form{}, err
 	}
 
 	var formID string
 	err = db.Get(&formID, "SELECT form_id FROM form_ms WHERE form_uuid = $1", id)
 	if err != nil {
-			log.Println("Error getting form_id:", err)
-			return models.Form{}, err
+		log.Println("Error getting form_id:", err)
+		return models.Form{}, err
 	}
 
 	_, err = db.Exec("DELETE FROM sign_form WHERE form_id = $1", formID)
 	if err != nil {
-			log.Println("Error deleting sign_form records:", err)
-			return models.Form{}, err
+		log.Println("Error deleting sign_form records:", err)
+		return models.Form{}, err
 	}
 
 	personalNames, err := GetAllPersonalName()
 	if err != nil {
-			log.Println("Error getting personal names:", err)
-			return models.Form{}, err
+		log.Println("Error getting personal names:", err)
+		return models.Form{}, err
 	}
 
 	for _, signatory := range signatories {
-			uuidString := uuid.New().String()
+		uuidString := uuid.New().String()
 
-			log.Printf("Processing signatory: %+v\n", signatory)
-			var userID string
-			for _, personal := range personalNames {
-					if personal.PersonalName == signatory.Name {
-							userID = personal.UserID
-							break
-					}
+		log.Printf("Processing signatory: %+v\n", signatory)
+		var userID string
+		for _, personal := range personalNames {
+			if personal.PersonalName == signatory.Name {
+				userID = personal.UserID
+				break
 			}
+		}
 
-			if userID == "" {
-					log.Printf("User ID not found for personal name: %s\n", signatory.Name)
-					continue
-			}
+		if userID == "" {
+			log.Printf("User ID not found for personal name: %s\n", signatory.Name)
+			continue
+		}
 
-			_, err := db.NamedExec("INSERT INTO sign_form (sign_uuid, form_id, user_id, name, position, role_sign, created_by) VALUES (:sign_uuid, :form_id, :user_id, :name, :position, :role_sign, :created_by)", map[string]interface{}{
-					"sign_uuid":  uuidString,
-					"user_id":    userID,
-					"form_id":    formID, // Adjusted to use documentID
-					"name":       signatory.Name,
-					"position":   signatory.Position,
-					"role_sign":  signatory.Role,
-					"created_by": username,
-			})
-			if err != nil {
-					return models.Form{}, err
-			}
+		_, err := db.NamedExec("INSERT INTO sign_form (sign_uuid, form_id, user_id, name, position, role_sign, created_by) VALUES (:sign_uuid, :form_id, :user_id, :name, :position, :role_sign, :created_by)", map[string]interface{}{
+			"sign_uuid":  uuidString,
+			"user_id":    userID,
+			"form_id":    formID, // Adjusted to use documentID
+			"name":       signatory.Name,
+			"position":   signatory.Position,
+			"role_sign":  signatory.Role,
+			"created_by": username,
+		})
+		if err != nil {
+			return models.Form{}, err
+		}
 	}
 
 	return updateDA, nil
@@ -721,6 +730,7 @@ func FormDAByDivision(divisionCode string) ([]models.Formss, error) {
 		project_ms p ON f.project_id = p.project_id
 		WHERE
 		d.document_code = 'DA'  AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
+		ORDER BY f.form_number DESC;
 	`, divisionCode)
 
 	if errSelect != nil {
@@ -765,6 +775,7 @@ func SignatureUser(userID int) ([]models.Formss, error) {
 		sign_form sf ON f.form_id = sf.form_id
 		WHERE
 		sf.user_id = $1 AND d.document_code = 'DA'  AND f.deleted_at IS NULL
+		ORDER BY f.form_number DESC;
 `, userID)
 	if err != nil {
 		return nil, err

@@ -86,12 +86,14 @@ func GetUserIDSign(id string) (models.UserIDSign, error) {
 }
 
 func UpdateFormSignature(updateSign models.UpdateSign, id string, username string) error {
+
 	currentTime := time.Now()
 
-	_, err := db.NamedExec("UPDATE sign_form SET is_sign = :is_sign, updated_by = :updated_by, updated_at = :updated_at WHERE sign_uuid = :id", map[string]interface{}{
+	_, err := db.NamedExec("UPDATE sign_form SET is_sign = :is_sign, updated_by = :updated_by, updated_at = :updated_at, sign_img = :image WHERE sign_uuid = :id", map[string]interface{}{
 		"is_sign":    updateSign.IsSign,
 		"updated_by": username,
 		"updated_at": currentTime,
+		"image":      updateSign.Image, // Menyimpan path gambar
 		"id":         id,
 	})
 	if err != nil {
@@ -343,4 +345,104 @@ func DeleteSignInfo(id, username string) error {
 	}
 
 	return nil
+}
+
+func SignatureNotif(userID int) ([]models.Notif, error) {
+	rows, err := db.Query(`
+SELECT 
+		f.form_uuid, f.form_number, f.form_ticket, f.form_status,
+		d.document_code, d.document_name, sf.role_sign, sf.is_sign, sf.created_at, sf.updated_at, sf.deleted_at
+		FROM 
+		form_ms f
+	LEFT JOIN 
+		document_ms d ON f.document_id = d.document_id
+	LEFT JOIN 
+		sign_form sf ON f.form_id = sf.form_id
+		WHERE
+		sf.user_id = $1 AND f.deleted_at IS NULL AND f.form_status = 'Published'
+		ORDER BY sf.created_at DESC
+`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Slice to hold all form data
+	var forms []models.Notif
+
+	// Iterate through the rows
+	for rows.Next() {
+		// Scan the row into the Forms struct
+		var form models.Notif
+		err := rows.Scan(
+			&form.FormUUID,
+			&form.FormNumber,
+			&form.FormTicket,
+			&form.FormStatus,
+			&form.DocumentCode,
+			&form.DocumentName,
+			&form.RoleSign,
+			&form.IsSign,
+			&form.CreatedAt,
+			&form.UpdatedAt,
+			&form.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		forms = append(forms, form)
+	}
+	// Return the forms as JSON response
+	return forms, nil
+}
+
+func ApproveNotif(userID int) ([]models.NotifApproval, error) {
+	rows, err := db.Query(`
+SELECT 
+		f.form_uuid, f.form_number, f.form_ticket, f.is_approve,
+		d.document_code, d.document_name, sf.role_sign, sf.is_sign, sf.created_at, sf.updated_at, sf.deleted_at
+		FROM 
+		form_ms f
+	LEFT JOIN 
+		document_ms d ON f.document_id = d.document_id
+	LEFT JOIN 
+		sign_form sf ON f.form_id = sf.form_id
+		WHERE
+		sf.user_id = $1 AND f.deleted_at IS NULL AND f.is_approve = True
+		ORDER BY sf.created_at DESC
+`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Slice to hold all form data
+	var forms []models.NotifApproval
+
+	// Iterate through the rows
+	for rows.Next() {
+		// Scan the row into the Forms struct
+		var form models.NotifApproval
+		err := rows.Scan(
+			&form.FormUUID,
+			&form.FormNumber,
+			&form.FormTicket,
+			&form.IsApprove,
+			&form.DocumentCode,
+			&form.DocumentName,
+			&form.RoleSign,
+			&form.IsSign,
+			&form.CreatedAt,
+			&form.UpdatedAt,
+			&form.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		forms = append(forms, form)
+	}
+	// Return the forms as JSON response
+	return forms, nil
 }

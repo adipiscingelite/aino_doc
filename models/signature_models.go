@@ -59,6 +59,7 @@ type Signatorie struct {
 
 type UpdateSign struct {
 	IsSign     bool      `json:"is_sign" db:"is_sign" validate:"required"`
+	Image      string    `json:"sign_img" db:"sign_img"`
 	Updated_by string    `json:"updated_by" db:"updated_by"`
 	Updated_at time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -76,10 +77,39 @@ type UserIDSign struct {
 }
 
 type SignatoryHA struct {
-	SignUUID          string       `json:"sign_uuid" db:"sign_uuid"`
-	SignatoryName     string       `json:"signatory_name" db:"signatory_name"`
-	SignatoryPosition string       `json:"signatory_position" db:"signatory_position"`
-	RoleSign          string       `json:"role_sign" db:"role_sign"`
-	IsSign            bool         `json:"is_sign" db:"is_sign"`
-	Updated_at        sql.NullTime `json:"updated_at" db:"updated_at"`
+	SignUUID          string         `json:"sign_uuid" db:"sign_uuid"`
+	SignatoryName     string         `json:"signatory_name" db:"signatory_name"`
+	SignatoryPosition string         `json:"signatory_position" db:"signatory_position"`
+	RoleSign          string         `json:"role_sign" db:"role_sign"`
+	IsSign            bool           `json:"is_sign" db:"is_sign"`
+	SignImg           sql.NullString `json:"sign_img" db:"sign_img"`
+	Updated_at        sql.NullTime   `json:"updated_at" db:"updated_at"`
+}
+
+type Notif struct {
+	FormUUID     string       `json:"form_uuid" db:"form_uuid"`
+	FormNumber   string       `json:"form_number" db:"form_number"`
+	FormTicket   string       `json:"form_ticket" db:"form_ticket" validate:"required"`
+	FormStatus   string       `json:"form_status" db:"form_status"`
+	DocumentCode string       `json:"document_code" db:"document_code"`
+	DocumentName string       `json:"document_name" db:"document_name"`
+	RoleSign     string       `json:"role_sign" db:"role_sign"`
+	IsSign       bool         `json:"is_sign" db:"is_sign"`
+	CreatedAt    time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at" db:"updated_at"`
+	DeletedAt    sql.NullTime `json:"deleted_at" db:"deleted_at"`
+}
+
+type NotifApproval struct {
+	FormUUID     string       `json:"form_uuid" db:"form_uuid"`
+	FormNumber   string       `json:"form_number" db:"form_number"`
+	FormTicket   string       `json:"form_ticket" db:"form_ticket" validate:"required"`
+	IsApprove    string       `json:"is_approve" db:"is_approve"`
+	DocumentCode string       `json:"document_code" db:"document_code"`
+	DocumentName string       `json:"document_name" db:"document_name"`
+	RoleSign     string       `json:"role_sign" db:"role_sign"`
+	IsSign       bool         `json:"is_sign" db:"is_sign"`
+	CreatedAt    time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at" db:"updated_at"`
+	DeletedAt    sql.NullTime `json:"deleted_at" db:"deleted_at"`
 }

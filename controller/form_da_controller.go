@@ -124,7 +124,7 @@ func AddDA(c echo.Context) error {
 	if errVal == nil {
 		// Gunakan addFormRequest.IsPublished untuk menentukan apakah menyimpan sebagai draft atau mempublish
 		addroleErr := service.AddDA(addFormRequest.FormData, addFormRequest.IsPublished, userName, userID, divisionCode, recursionCount, addFormRequest.DA, addFormRequest.Signatory)
-		
+
 		if addroleErr != nil {
 			log.Print(addroleErr)
 			return c.JSON(http.StatusInternalServerError, &models.Response{
@@ -534,16 +534,15 @@ func UpdateFormDA(c echo.Context) error {
 			Status:  false,
 		})
 	}
-	if previousContent.FormStatus == "Published" {
+	if previousContent.ApprovalStatus == "Disetujui" {
 		return c.JSON(http.StatusBadRequest, &models.Response{
 			Code:    400,
-			Message: "Tidak dapat memperbarui dokumen yang sudah dipublish",
+			Message: "Tidak dapat memperbarui dokumen yang sudah diapprove!",
 			Status:  false,
 		})
 	}
-	
 
-	_, errService := service.UpdateFormDA(updateFormRequest.FormData, updateFormRequest.DA, userName, userID, updateFormRequest.IsPublished, id, updateFormRequest.Signatory)
+	_, errService := service.UpdateFormDA(updateFormRequest.FormData, updateFormRequest.DA, userName, userID, id, updateFormRequest.Signatory)
 	if errService != nil {
 		log.Println("Kesalahan selama pembaruan:", errService)
 		if errService.Error() == "You are not authorized to update this form" {

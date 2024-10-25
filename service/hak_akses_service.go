@@ -77,7 +77,113 @@ func generateFormNumberHA(documentID int64, divisionCode string, recursionCount 
 	return formNumberWithDivision, nil
 }
 
-func AddHakAkses(addForm models.FormHA, infoHA []models.AddInfoHA, ha models.HA, isPublished bool, userID int, divisionCode string, recrusionCount int, username string, signatories []models.Signatory) error {
+func AddHakAkses(addForm models.FormHA, infoHA []models.AddInfoHAReq, haReq models.HAReq, isPublished bool, userID int, divisionCode string, recrusionCount int, username string, signatories []models.Signatory) error {
+	currentTimestamp := time.Now().UnixNano() / int64(time.Microsecond)
+	uniqueID := uuid.New().ID()
+	appID := currentTimestamp + int64(uniqueID)
+	uuidObj := uuid.New()
+	uuidString := uuidObj.String()
+
+	formStatus := "Draft"
+	if isPublished {
+		formStatus = "Published"
+	}
+
+	var documentID int64
+	err := db.Get(&documentID, "SELECT document_id FROM document_ms WHERE document_uuid = $1", addForm.DocumentUUID)
+	if err != nil {
+		log.Println("Error getting document_id:", err)
+		return err
+	}
+
+	formNumberHA, err := generateFormNumberHA(documentID, divisionCode, recrusionCount+1)
+	if err != nil {
+		// Handle error
+		log.Println("Error generating form number:", err)
+		return err
+	}
+
+	formData, err := json.Marshal(haReq)
+	if err != nil {
+		log.Println("Error marshaling ITCM struct:", err)
+		return err
+	}
+	_, err = db.NamedExec("INSERT INTO form_ms (form_id, form_uuid, document_id, user_id, project_id, form_number, form_ticket, form_status, form_data, created_by) VALUES (:form_id, :form_uuid, :document_id, :user_id, :project_id, :form_number, :form_ticket, :form_status, :form_data, :created_by)", map[string]interface{}{
+		"form_id":     appID,
+		"form_uuid":   uuidString,
+		"document_id": documentID,
+		"user_id":     userID,
+		"project_id":  nil,
+		"form_number": formNumberHA,
+		"form_ticket": addForm.FormTicket,
+		"form_status": formStatus,
+		"form_data":   formData, // Convert JSON to string
+		"created_by":  username,
+	})
+
+	// fmt.Println(formNumberHA)
+
+	if err != nil {
+		return err
+	}
+	personalNames, err := GetAllPersonalName() // Mengambil daftar semua personal name
+	if err != nil {
+		log.Println("Error getting personal names:", err)
+		return err
+	}
+
+	fmt.Println("bejir", infoHA)
+	for _, info := range infoHA {
+		uuidString := uuid.New().String()
+
+		_, err := db.NamedExec("INSERT INTO hak_akses (ha_uuid, form_id, nama_pengguna, ruang_lingkup, jangka_waktu, created_by) VALUES (:ha_uuid, :form_id, :nama_pengguna, :ruang_lingkup, :jangka_waktu, :created_by)", map[string]interface{}{
+			"ha_uuid":       uuidString,
+			"form_id":       appID,
+			"nama_pengguna": info.NamaPengguna,
+			"ruang_lingkup": info.RuangLingkup,
+			"jangka_waktu":  info.JangkaWaktu,
+			"created_by":    username,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, signatory := range signatories {
+		uuidString := uuid.New().String()
+
+		// Mencari user_id yang sesuai dengan personal_name yang dipilih
+		var userID string
+		for _, personal := range personalNames {
+			if personal.PersonalName == signatory.Name {
+				userID = personal.UserID
+				break
+			}
+		}
+
+		// Memastikan user_id ditemukan untuk personal_name yang dipilih
+		if userID == "" {
+			log.Printf("User ID not found for personal name: %s\n", signatory.Name)
+			continue
+		}
+
+		_, err := db.NamedExec("INSERT INTO sign_form (sign_uuid, form_id, user_id, name, position, role_sign, created_by) VALUES (:sign_uuid, :form_id, :user_id, :name, :position, :role_sign, :created_by)", map[string]interface{}{
+			"sign_uuid":  uuidString,
+			"user_id":    userID,
+			"form_id":    appID,
+			"name":       signatory.Name,
+			"position":   signatory.Position,
+			"role_sign":  signatory.Role,
+			"created_by": username,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func AddHakAksesReview(addForm models.FormHA, infoHA []models.AddInfoHA, ha models.HA, isPublished bool, userID int, divisionCode string, recrusionCount int, username string, signatories []models.Signatory) error {
 	currentTimestamp := time.Now().UnixNano() / int64(time.Microsecond)
 	uniqueID := uuid.New().ID()
 	appID := currentTimestamp + int64(uniqueID)
@@ -105,7 +211,7 @@ func AddHakAkses(addForm models.FormHA, infoHA []models.AddInfoHA, ha models.HA,
 
 	formData, err := json.Marshal(ha)
 	if err != nil {
-		log.Println("Error marshaling ITCM struct:", err)
+		log.Println("Error marshaling HA struct:", err)
 		return err
 	}
 	_, err = db.NamedExec("INSERT INTO form_ms (form_id, form_uuid, document_id, user_id, project_id, form_number, form_ticket, form_status, form_data, created_by) VALUES (:form_id, :form_uuid, :document_id, :user_id, :project_id, :form_number, :form_ticket, :form_status, :form_data, :created_by)", map[string]interface{}{
@@ -185,7 +291,73 @@ func AddHakAkses(addForm models.FormHA, infoHA []models.AddInfoHA, ha models.HA,
 	return nil
 }
 
-func GetAllHakAkses() ([]models.FormsHA, error) {
+func GetAllHakAkses() ([]models.FormsHAReq, error) {
+	rows, err := db.Query(`SELECT
+    f.form_uuid,
+    f.form_number,
+    f.form_ticket,
+    f.form_status,
+    d.document_name,
+    f.created_by,
+    f.created_at,
+    f.updated_by,
+    f.updated_at,
+    f.deleted_by,
+    f.deleted_at,
+    (f.form_data->>'form_type')::text AS form_type,
+    (f.form_data->>'nama_tim')::text AS nama_tim,
+    (f.form_data->>'product_manager')::text AS product_manager,
+    (f.form_data->>'nama_pengusul')::text AS nama_pengusul,
+    (f.form_data->>'tanggal_usul')::text AS tanggal_usul
+FROM
+    form_ms f
+LEFT JOIN
+    document_ms d ON f.document_id = d.document_id
+WHERE
+    d.document_code = 'HA' AND f.deleted_at IS NULL
+    AND ((f.form_data->>'form_type') = 'Permintaan' OR (f.form_data->>'form_type') = 'Penghapusan')
+ORDER BY f.form_number DESC;
+
+	`)
+	var forms []models.FormsHAReq
+	//rows, err := db.Query(&forms, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var form models.FormsHAReq
+		err := rows.Scan(
+			&form.FormUUID,
+			&form.FormNumber,
+			&form.FormTicket,
+			&form.FormStatus,
+			&form.DocumentName,
+			&form.CreatedBy,
+			&form.CreatedAt,
+			&form.UpdatedBy,
+			&form.UpdatedAt,
+			&form.DeletedBy,
+			&form.DeletedAt,
+			&form.FormType, // Urutan form_type dipindahkan ke depan
+			&form.NamaTim,
+			&form.ProductManager,
+			&form.NamaPengusul,
+			&form.TanggalUsul,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		forms = append(forms, form)
+	}
+
+	return forms, nil
+}
+
+func GetAllHakAksesReview() ([]models.FormsHA, error) {
 	rows, err := db.Query(`SELECT
 		f.form_uuid,
 		f.form_number,
@@ -200,6 +372,8 @@ func GetAllHakAkses() ([]models.FormsHA, error) {
 		document_ms d ON f.document_id = d.document_id
 	WHERE
 		d.document_code = 'HA' AND f.deleted_at IS NULL
+    AND (f.form_data->>'form_type') = 'Review'
+		ORDER BY f.form_number DESC;
 	`)
 	var forms []models.FormsHA
 	//rows, err := db.Query(&forms, query, userID)
@@ -234,19 +408,109 @@ func GetAllHakAkses() ([]models.FormsHA, error) {
 	return forms, nil
 }
 
+type FormwoilahWithSignatories struct {
+	Form        models.FormsHAReq        `json:"form"`
+	InfoHA      []models.HakAksesRequest `json:"hak_akses_info"`
+	Signatories []models.SignatoryHA     `json:"signatories"`
+}
+
+func GetSpecAllHA(id string) (*FormwoilahWithSignatories, error) {
+	var FormwoilahWithSignatories FormwoilahWithSignatories
+
+	// Ambil data form
+	err := db.Get(&FormwoilahWithSignatories.Form, `
+			SELECT 
+					f.form_uuid,
+					f.form_number,
+					f.form_status,
+					d.document_name,
+					CASE
+						WHEN f.is_approve IS NULL THEN 'Menunggu Disetujui'
+						WHEN f.is_approve = false THEN 'Tidak Disetujui'
+						WHEN f.is_approve = true THEN 'Disetujui'
+					END AS approval_status,
+					f.created_by,
+					f.created_at,
+					f.updated_by,
+					f.updated_at,
+					f.deleted_by,
+					f.deleted_at,
+					(f.form_data->>'form_type')::text AS form_type,
+					(f.form_data->>'nama_tim')::text AS nama_tim,
+					(f.form_data->>'product_manager')::text AS product_manager,
+					(f.form_data->>'nama_pengusul')::text AS nama_pengusul,
+					(f.form_data->>'tanggal_usul')::text AS tanggal_usul
+			FROM
+					form_ms f
+			LEFT JOIN 
+					document_ms d ON f.document_id = d.document_id
+			WHERE
+					f.form_uuid = $1 AND d.document_code = 'HA' AND f.deleted_at IS NULL
+    			AND ((f.form_data->>'form_type') = 'Permintaan' OR (f.form_data->>'form_type') = 'Penghapusan')
+	`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ambil data hak akses info
+	err = db.Select(&FormwoilahWithSignatories.InfoHA, `
+			SELECT 
+					ha_uuid,
+					nama_pengguna,
+					ruang_lingkup,
+					jangka_waktu
+			FROM
+					hak_akses
+			WHERE
+					form_id IN (
+							SELECT form_id FROM form_ms WHERE form_uuid = $1 AND deleted_at IS NULL
+					)
+	`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ambil data signatories
+	err = db.Select(&FormwoilahWithSignatories.Signatories, `
+			 SELECT 
+            sign_uuid,
+            name AS signatory_name,
+            position AS signatory_position,
+            role_sign,
+            is_sign,
+						CASE
+							WHEN sign_img IS NOT NULL AND sign_img != '' THEN CONCAT('/assets/images/signatures/', sign_img)
+							ELSE ''
+						END AS sign_img,
+						updated_at
+        FROM
+					sign_form
+			WHERE
+					form_id IN (
+							SELECT form_id FROM form_ms WHERE form_uuid = $1 AND deleted_at IS NULL
+					)
+	`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FormwoilahWithSignatories, nil
+}
+
 type FormWithSignatories struct {
 	Form        models.FormsHA        `json:"form"`
 	InfoHA      []models.HakAksesInfo `json:"hak_akses_info"`
 	Signatories []models.SignatoryHA  `json:"signatories"`
 }
 
-func GetSpecAllHA(id string) (*FormWithSignatories, error) {
+func GetSpecAllHAReview(id string) (*FormWithSignatories, error) {
 	var formWithSignatories FormWithSignatories
 
 	// Ambil data form
 	err := db.Get(&formWithSignatories.Form, `
 			SELECT 
 					f.form_uuid,
+					f.form_number,
 					f.form_status,
 					d.document_name,
 					f.created_by,
@@ -262,6 +526,7 @@ func GetSpecAllHA(id string) (*FormWithSignatories, error) {
 					document_ms d ON f.document_id = d.document_id
 			WHERE
 					f.form_uuid = $1 AND d.document_code = 'HA' AND f.deleted_at IS NULL
+    			AND (f.form_data->>'form_type') = 'Review'
 	`, id)
 	if err != nil {
 		return nil, err
@@ -310,6 +575,39 @@ func GetSpecAllHA(id string) (*FormWithSignatories, error) {
 	return &formWithSignatories, nil
 }
 
+func GetSpecHakAksesReq(id string) (models.FormsHAReq, error) {
+	var specHA models.FormsHAReq
+
+	err := db.Get(&specHA, `SELECT 
+	f.form_uuid,
+	f.form_status,
+	d.document_name,
+	f.created_by,
+	f.created_at,
+	f.updated_by,
+	f.updated_at,
+	f.deleted_by,
+	f.deleted_at,
+		(f.form_data->>'form_type')::text AS form_type,
+    (f.form_data->>'nama_tim')::text AS nama_tim,
+    (f.form_data->>'product_manager')::text AS product_manager,
+    (f.form_data->>'nama_pengusul')::text AS nama_pengusul,
+    (f.form_data->>'tanggal_usul')::text AS tanggal_usul
+FROM
+	form_ms f
+LEFT JOIN 
+	document_ms d ON f.document_id = d.document_id
+WHERE
+	f.form_uuid = $1 AND d.document_code = 'HA' AND f.deleted_at IS NULL
+	`, id)
+	if err != nil {
+		return models.FormsHAReq{}, err
+	}
+
+	return specHA, nil
+
+}
+
 func GetSpecHakAkses(id string) (models.FormsHA, error) {
 	var specHA models.FormsHA
 
@@ -330,6 +628,7 @@ LEFT JOIN
 	document_ms d ON f.document_id = d.document_id
 WHERE
 	f.form_uuid = $1 AND d.document_code = 'HA' AND f.deleted_at IS NULL
+    AND (f.form_data->>'form_type') = 'Review'
 	`, id)
 	if err != nil {
 		return models.FormsHA{}, err
@@ -339,7 +638,125 @@ WHERE
 
 }
 
-func UpdateHakAkses(id string, username string, ha models.HA, signatories []models.Signatory, info_ha []models.HakAksesInfo) error {
+func UpdateHakAkses(id string, username string, ha models.HAReq, signatories []models.Signatory, info_ha []models.HakAksesRequest) error {
+	log.Printf("Updating HA with ID: %s, User: %s, Data: %+v", id, username, ha)
+	currentTime := time.Now()
+
+	fmt.Println("Info ha", info_ha)
+
+	// Marshaling data HA menjadi JSON
+	formData, err := json.Marshal(ha)
+	if err != nil {
+		log.Println("Error marshaling HA struct:", err)
+		return err
+	}
+	log.Println("HA JSON:", string(formData))
+
+	formStatus := "Draft"
+
+	// Menjalankan query UPDATE
+	result, err := db.Exec("UPDATE form_ms SET form_data = $1, form_status = $2, updated_at = $3, updated_by = $4 WHERE form_uuid = $5",
+		formData, formStatus, currentTime, username, id)
+	if err != nil {
+		log.Println("Error executing query:", err)
+		return err
+	}
+
+	var formID string
+	err = db.Get(&formID, "SELECT form_id FROM form_ms WHERE form_uuid = $1", id)
+	if err != nil {
+		log.Println("Error getting form_id:", err)
+		return err // Return only the error
+	}
+
+	_, err = db.Exec("DELETE FROM sign_form WHERE form_id = $1", formID)
+	if err != nil {
+		log.Println("Error deleting sign_form records:", err)
+		return err // Return only the error
+	}
+
+	personalNames, err := GetAllPersonalName()
+	if err != nil {
+		log.Println("Error getting personal names:", err)
+		return err // Return only the error
+	}
+
+	for _, signatory := range signatories {
+		uuidString := uuid.New().String()
+
+		log.Printf("Processing signatory: %+v\n", signatory)
+		var userID string
+		for _, personal := range personalNames {
+			if personal.PersonalName == signatory.Name {
+				userID = personal.UserID
+				break
+			}
+		}
+
+		if userID == "" {
+			log.Printf("User ID not found for personal name: %s\n", signatory.Name)
+			continue
+		}
+
+		_, err := db.NamedExec("INSERT INTO sign_form (sign_uuid, form_id, user_id, name, position, role_sign, created_by) VALUES (:sign_uuid, :form_id, :user_id, :name, :position, :role_sign, :created_by)", map[string]interface{}{
+			"sign_uuid":  uuidString,
+			"user_id":    userID,
+			"form_id":    formID,
+			"name":       signatory.Name,
+			"position":   signatory.Position,
+			"role_sign":  signatory.Role,
+			"created_by": username,
+		})
+		if err != nil {
+			return err // Return only the error
+		}
+	}
+
+	_, err = db.Exec("DELETE FROM hak_akses WHERE form_id = $1", formID)
+	if err != nil {
+		log.Println("Error deleting hak_akses records:", err)
+		return err // Return only the error
+	}
+
+	for _, info_ha := range info_ha {
+		uuidString := uuid.New().String()
+		_, err := db.NamedExec(`INSERT INTO hak_akses (ha_uuid, form_id, nama_pengguna, ruang_lingkup, jangka_waktu, created_by, created_at, updated_by, updated_at) VALUES (:ha_uuid, :form_id, :nama_pengguna, :ruang_lingkup, :jangka_waktu, :created_by, :created_at, :updated_by, :updated_at)`,
+			map[string]interface{}{
+				"ha_uuid":     uuidString,
+				"form_id":       formID,
+				"nama_pengguna": info_ha.NamaPengguna,
+				"ruang_lingkup": info_ha.RuangLingkup,
+				"jangka_waktu":  info_ha.JangkaWaktu,
+				"created_by":    username,
+				"created_at":    time.Now(),
+				"updated_by":    username,
+				"updated_at":    time.Now(),
+			})
+		if err != nil {
+			log.Println("Error inserting record:", err)
+			return err
+		}
+
+		if err != nil {
+			log.Println("Error inserting record:", err)
+			return err
+		}
+	}
+
+	// Memeriksa jumlah baris yang diperbarui
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Println("Error getting rows affected:", err)
+		return err
+	}
+	if rowsAffected == 0 {
+		log.Println("No rows updated. Check if the ID exists and is correct.")
+	}
+
+	return nil // Return nil on success
+}
+
+func UpdateHakAksesReview(id string, username string, ha models.HA, signatories []models.Signatory, info_ha []models.HakAksesInfo) error {
 	log.Printf("Updating HA with ID: %s, User: %s, Data: %+v", id, username, ha)
 	currentTime := time.Now()
 
@@ -473,6 +890,7 @@ FROM
 WHERE
 	form_id IN (
 		SELECT form_id FROM form_ms WHERE form_uuid = $1 AND deleted_at IS NULL
+    AND (f.form_data->>'form_type') = 'Review'
 	)
 `, id)
 	if err != nil {
@@ -483,7 +901,67 @@ WHERE
 	return infoHA, nil
 }
 
-func MyFormHA(userID int) ([]models.FormsHA, error) {
+func MyFormHA(userID int) ([]models.FormsHAReq, error) {
+	rows, err := db.Query(`SELECT
+		f.form_uuid,
+		f.form_number,
+		f.form_ticket,
+		f.form_status,
+		d.document_name,
+		f.created_by, f.created_at, f.updated_by, f.updated_at, f.deleted_by, f.deleted_at,    
+		(f.form_data->>'form_type')::text AS form_type,
+    (f.form_data->>'nama_tim')::text AS nama_tim,
+    (f.form_data->>'product_manager')::text AS product_manager,
+    (f.form_data->>'nama_pengusul')::text AS nama_pengusul,
+    (f.form_data->>'tanggal_usul')::text AS tanggal_usul
+	FROM
+		form_ms f
+	LEFT JOIN
+		document_ms d ON f.document_id = d.document_id
+	WHERE
+	f.user_id = $1 AND d.document_code = 'HA' AND  f.deleted_at IS NULL
+    AND ((f.form_data->>'form_type') = 'Permintaan' OR (f.form_data->>'form_type') = 'Penghapusan')
+		ORDER BY f.form_number DESC;
+	`, userID)
+	var forms []models.FormsHAReq
+	//rows, err := db.Query(&forms, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var form models.FormsHAReq
+		err := rows.Scan(
+			&form.FormUUID,
+			&form.FormNumber,
+			&form.FormTicket,
+			&form.FormStatus,
+			&form.DocumentName,
+			&form.CreatedBy,
+			&form.CreatedAt,
+			&form.UpdatedBy,
+			&form.UpdatedAt,
+			&form.DeletedBy,
+			&form.DeletedAt,
+			&form.FormType,
+			&form.NamaTim,
+			&form.ProductManager,
+			&form.NamaPengusul,
+			&form.TanggalUsul,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		forms = append(forms, form)
+	}
+
+	return forms, nil
+}
+
+func MyFormHAReview(userID int) ([]models.FormsHA, error) {
 	rows, err := db.Query(`SELECT
 		f.form_uuid,
 		f.form_number,
@@ -498,6 +976,8 @@ func MyFormHA(userID int) ([]models.FormsHA, error) {
 		document_ms d ON f.document_id = d.document_id
 	WHERE
 	f.user_id = $1 AND d.document_code = 'HA' AND  f.deleted_at IS NULL
+    AND (f.form_data->>'form_type') = 'Review'
+		ORDER BY f.form_number DESC;
 	`, userID)
 	var forms []models.FormsHA
 	//rows, err := db.Query(&forms, query, userID)
@@ -545,6 +1025,8 @@ func GetFormsByAdmin() ([]models.FormsHA, error) {
 		document_ms d ON f.document_id = d.document_id
 	WHERE
 		d.document_code = 'HA' AND f.deleted_at IS NULL
+    AND (f.form_data->>'form_type') = 'Review'
+		ORDER BY f.form_number DESC;
 	`
 
 	// Assuming 'db' is an *sqlx.DB instance
@@ -578,6 +1060,7 @@ func SignatureUserHA(userID int) ([]models.FormsHA, error) {
 		sign_form sf ON f.form_id = sf.form_id
 	WHERE
 			sf.user_id = $1 AND d.document_code = 'HA' AND f.deleted_at IS NULL
+		ORDER BY f.form_number DESC;
 			`, userID)
 	var forms []models.FormsHA
 	//rows, err := db.Query(&forms, query, userID)
@@ -626,7 +1109,51 @@ func GetHACode() (models.DocCodeName, error) {
 	return documentCode, nil
 }
 
-func FormHAByDivision(divisionCode string) ([]models.FormsHA, error) {
+func FormHAByDivision(divisionCode string) ([]models.FormsHAReq, error) {
+	var form []models.FormsHAReq
+
+	// Now use the retrieved documentID in the query
+	errSelect := db.Select(&form, `
+			SELECT 
+			f.form_uuid,
+			f.form_number,
+			f.form_ticket,
+			f.form_status,
+			f.created_by, f.created_at, f.updated_by, f.updated_at, f.deleted_by, f.deleted_at,
+			d.document_name,
+			  (f.form_data->>'form_type')::text AS form_type,
+				(f.form_data->>'nama_tim')::text AS nama_tim,
+				(f.form_data->>'product_manager')::text AS product_manager,
+				(f.form_data->>'nama_pengusul')::text AS nama_pengusul,
+				(f.form_data->>'tanggal_usul')::text AS tanggal_usul,
+			CASE
+				WHEN f.is_approve IS NULL THEN 'Menunggu Disetujui'
+				WHEN f.is_approve = false THEN 'Tidak Disetujui'
+				WHEN f.is_approve = true THEN 'Disetujui'
+			END AS approval_status -- Alias the CASE expression as ApprovalStatus
+			FROM 
+			form_ms f
+		LEFT JOIN 
+			document_ms d ON f.document_id = d.document_id
+			WHERE
+			d.document_code = 'HA' AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1 
+    AND ((f.form_data->>'form_type') = 'Permintaan' OR (f.form_data->>'form_type') = 'Penghapusan')
+		ORDER BY f.form_number DESC;
+	`, divisionCode)
+
+	if errSelect != nil {
+		log.Print(errSelect)
+		return nil, errSelect
+	}
+
+	if len(form) == 0 {
+		return nil, sql.ErrNoRows
+	}
+
+	return form, nil
+}
+
+func FormHAByDivisionReview(divisionCode string) ([]models.FormsHA, error) {
 	var form []models.FormsHA
 
 	// Now use the retrieved documentID in the query
@@ -649,7 +1176,9 @@ func FormHAByDivision(divisionCode string) ([]models.FormsHA, error) {
 		LEFT JOIN 
 			document_ms d ON f.document_id = d.document_id
 			WHERE
-			d.document_code = 'HA' AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
+			d.document_code = 'HA' AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1 
+    AND (f.form_data->>'form_type') = 'Review'
+		ORDER BY f.form_number DESC;
 	`, divisionCode)
 
 	if errSelect != nil {

@@ -4,12 +4,18 @@ import (
 	"database/sql"
 	"document/models"
 	"document/service"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
+	// "io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -68,136 +74,150 @@ func GetSpecSignatureByID(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, getAppRole)
 }
-
+// UpdateSignature updates the signature of a user
 func UpdateSignature(c echo.Context) error {
 	id := c.Param("id")
-	perviousContent, errGet := service.GetSpecSignatureByID(id)
+
+	// Retrieve previous signature data
+	previousContent, errGet := service.GetSpecSignatureByID(id)
 	if errGet != nil {
-		return c.JSON(http.StatusNotFound, &models.Response{
-			Code:    404,
-			Message: "Gagal mengupdate signature. Signature tidak ditemukan!",
-			Status:  false,
-		})
+			return c.JSON(http.StatusNotFound, &models.Response{
+					Code:    404,
+					Message: "Gagal mengupdate signature. Signature tidak ditemukan!",
+					Status:  false,
+			})
 	}
+
+	// Handle JWT token
 	tokenString := c.Request().Header.Get("Authorization")
 	secretKey := "secretJwToken"
-
-	if tokenString == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"code":    401,
-			"message": "Token tidak ditemukan!",
-			"status":  false,
-		})
+	if tokenString == "" || !strings.HasPrefix(tokenString, "Bearer ") {
+			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+					"code":    401,
+					"message": "Token tidak valid!",
+					"status":  false,
+			})
 	}
-
-	// Periksa apakah tokenString mengandung "Bearer "
-	if !strings.HasPrefix(tokenString, "Bearer ") {
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"code":    401,
-			"message": "Token tidak valid!",
-			"status":  false,
-		})
-	}
-
 	tokenOnly := strings.TrimPrefix(tokenString, "Bearer ")
-
 	decrypted, err := DecryptJWE(tokenOnly, secretKey)
 	if err != nil {
-		fmt.Println("Gagal mendekripsi token:", err)
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"code":    401,
-			"message": "Token tidak valid!",
-			"status":  false,
-		})
+			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+					"code":    401,
+					"message": "Token tidak valid!",
+					"status":  false,
+			})
 	}
 
+	// Decode JWT claims
 	var claims JwtCustomClaims
 	errJ := json.Unmarshal([]byte(decrypted), &claims)
 	if errJ != nil {
-		fmt.Println("Gagal mengurai klaim:", errJ)
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"code":    401,
-			"message": "Token tidak valid!",
-			"status":  false,
-		})
+			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+					"code":    401,
+					"message": "Token tidak valid!",
+					"status":  false,
+			})
 	}
 	userName := c.Get("user_name").(string)
-	fmt.Println("Token yang sudah dideskripsi:", decrypted)
 
-	fmt.Println("User name:", userName)
-
-	if userName == "" {
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"code":    401,
-			"message": "Invalid token atau token tidak ditemukan!",
-			"status":  false,
-		})
-	}
-
+	// Verify user
 	userIDFromToken := claims.UserID
 	signatory, err := service.GetUserIDSign(id)
-	if err != nil {
-		// Handle error
-		return c.JSON(http.StatusInternalServerError, &models.Response{
-			Code:    500,
-			Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
-			Status:  false,
-		})
-	}
-
-	if signatory.UserID != userIDFromToken {
-		// Jika tidak cocok, kembalikan tanggapan yang sesuai
-		return c.JSON(http.StatusUnauthorized, &models.Response{
-			Code:    401,
-			Message: "Anda tidak memiliki izin untuk mengupdate tanda tangan ini!",
-			Status:  false,
-		})
+	if err != nil || signatory.UserID != userIDFromToken {
+			return c.JSON(http.StatusUnauthorized, &models.Response{
+					Code:    401,
+					Message: "Anda tidak memiliki izin untuk mengupdate tanda tangan ini!",
+					Status:  false,
+			})
 	}
 
 	var editSign models.UpdateSign
 	if err := c.Bind(&editSign); err != nil {
-		log.Print(err)
-		return c.JSON(http.StatusBadRequest, &models.Response{
-			Code:    400,
-			Message: "Data invalid!",
-			Status:  false,
-		})
+			log.Print(err)
+			return c.JSON(http.StatusBadRequest, &models.Response{
+					Code:    400,
+					Message: "Data invalid!",
+					Status:  false,
+			})
 	}
+	fmt.Println(editSign)
+
+	// Handle Base64 image
+	signImg := editSign.Image
+	if signImg == "" {
+			return c.JSON(http.StatusBadRequest, &models.Response{
+					Code:    400,
+					Message: "Gambar tidak ditemukan!",
+					Status:  false,
+			})
+	}
+
+	// Extract the Base64 data
+	parts := strings.Split(signImg, ",")
+	if len(parts) != 2 {
+			return c.JSON(http.StatusBadRequest, &models.Response{
+					Code:    400,
+					Message: "Data gambar tidak valid!",
+					Status:  false,
+			})
+	}
+
+	// Decode the Base64 image
+	imgData, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+			return c.JSON(http.StatusBadRequest, &models.Response{
+					Code:    400,
+					Message: "Gagal mendekode gambar!",
+					Status:  false,
+			})
+	}
+
+	// Generate a unique filename using UUID
+	uniqueID := uuid.New().String() // Generates a new UUID
+	filename := fmt.Sprintf("signature_%s.png", uniqueID) // Format filename
+
+	// Set folder for saving image
+	dst := filepath.Join("assets/images/signatures", filename) // Use the unique filename
+
+	// Save the image to file
+	err = os.WriteFile(dst, imgData, 0644) // Using WriteFile to create the file
+	if err != nil {
+			return c.JSON(http.StatusInternalServerError, &models.Response{
+					Code:    500,
+					Message: "Gagal menyimpan file!",
+					Status:  false,
+			})
+	}
+
+	// Prepare data to update signature
+	editSign.Image = filename // Simpan nama file yang unik ke database
 
 	err = c.Validate(&editSign)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, &models.Response{
-			Code:    422,
-			Message: "Data tidak boleh kosong!",
-			Status:  false,
-		})
+			return c.JSON(http.StatusUnprocessableEntity, &models.Response{
+					Code:    422,
+					Message: "Data tidak boleh kosong!",
+					Status:  false,
+			})
 	}
-	if err == nil {
-		errService := service.UpdateFormSignature(editSign, id, userName)
-		if errService != nil {
+
+	// Update signature in the service
+	errService := service.UpdateFormSignature(editSign, id, userName)
+	if errService != nil {
 			log.Println("Kesalahan selama pembaruan:", errService)
 			return c.JSON(http.StatusInternalServerError, &models.Response{
-				Code:    500,
-				Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
-				Status:  false,
+					Code:    500,
+					Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
+					Status:  false,
 			})
-		}
+	}
 
-		log.Println(perviousContent)
-		return c.JSON(http.StatusOK, &models.Response{
+	log.Println(previousContent)
+	return c.JSON(http.StatusOK, &models.Response{
 			Code:    200,
 			Message: "Berhasil menambahkan tanda tangan!",
 			Status:  true,
-		})
-	} else {
-		log.Println("Kesalahan sebelum pembaruan:", err)
-		return c.JSON(http.StatusInternalServerError, &models.Response{
-			Code:    500,
-			Message: "Terjadi kesalahan internal pada server. Mohon coba beberapa saat lagi!",
-			Status:  false,
-		})
-	}
-
+	})
 }
 
 func AddApproval(c echo.Context) error {
@@ -744,4 +764,131 @@ func DeleteSignInfo(c echo.Context) error {
 		Status:  true,
 	})
 
+}
+
+
+func SignatureNotif(c echo.Context) error {
+	tokenString := c.Request().Header.Get("Authorization")
+	secretKey := "secretJwToken"
+
+	if tokenString == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	// Periksa apakah tokenString mengandung "Bearer "
+	if !strings.HasPrefix(tokenString, "Bearer ") {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	// Hapus "Bearer " dari tokenString
+	tokenOnly := strings.TrimPrefix(tokenString, "Bearer ")
+
+	//dekripsi token JWE
+	decrypted, err := DecryptJWE(tokenOnly, secretKey)
+	if err != nil {
+		fmt.Println("Gagal mendekripsi token:", err)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	var claims JwtCustomClaims
+	errJ := json.Unmarshal([]byte(decrypted), &claims)
+	if errJ != nil {
+		fmt.Println("Gagal mengurai klaim:", errJ)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+	userID := c.Get("user_id").(int)
+	roleCode := c.Get("role_code").(string)
+
+	fmt.Println("User ID :", userID)
+	fmt.Println("Role code", roleCode)
+	form, err := service.SignatureNotif(userID)
+	if err != nil {
+		log.Print(err)
+		response := models.Response{
+			Code:    500,
+			Message: "Terjadi kesalahan internal server. Mohon coba beberapa saat lagi",
+			Status:  false,
+		}
+		return c.JSON(http.StatusInternalServerError, response)
+	}
+	return c.JSON(http.StatusOK, form)
+}
+
+func ApproveNotif(c echo.Context) error {
+	tokenString := c.Request().Header.Get("Authorization")
+	secretKey := "secretJwToken"
+
+	if tokenString == "" {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak ditemukan!",
+			"status":  false,
+		})
+	}
+
+	// Periksa apakah tokenString mengandung "Bearer "
+	if !strings.HasPrefix(tokenString, "Bearer ") {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	// Hapus "Bearer " dari tokenString
+	tokenOnly := strings.TrimPrefix(tokenString, "Bearer ")
+
+	//dekripsi token JWE
+	decrypted, err := DecryptJWE(tokenOnly, secretKey)
+	if err != nil {
+		fmt.Println("Gagal mendekripsi token:", err)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+
+	var claims JwtCustomClaims
+	errJ := json.Unmarshal([]byte(decrypted), &claims)
+	if errJ != nil {
+		fmt.Println("Gagal mengurai klaim:", errJ)
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Token tidak valid!",
+			"status":  false,
+		})
+	}
+	userID := c.Get("user_id").(int)
+	roleCode := c.Get("role_code").(string)
+
+	fmt.Println("User ID :", userID)
+	fmt.Println("Role code", roleCode)
+	form, err := service.ApproveNotif(userID)
+	if err != nil {
+		log.Print(err)
+		response := models.Response{
+			Code:    500,
+			Message: "Terjadi kesalahan internal server. Mohon coba beberapa saat lagi",
+			Status:  false,
+		}
+		return c.JSON(http.StatusInternalServerError, response)
+	}
+	return c.JSON(http.StatusOK, form)
 }

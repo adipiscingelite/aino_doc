@@ -539,14 +539,15 @@ func UpdateFormITCM(c echo.Context) error {
 			Status:  false,
 		})
 	}
-	if previousContent.FormStatus == "Published" {
+	
+	if previousContent.ApprovalStatus == "Disetujui" {
 		return c.JSON(http.StatusBadRequest, &models.Response{
 			Code:    400,
-			Message: "Tidak dapat memperbarui dokumen yang sudah dipublish",
+			Message: "Tidak dapat memperbarui dokumen yang sudah diapprove!",
 			Status:  false,
 		})
 	}
-
+	
 	_, errService := service.UpdateFormITCM(updateFormRequest.FormData, updateFormRequest.ITCM, userName, userID, updateFormRequest.IsPublished, id, updateFormRequest.Signatory)
 	if errService != nil {
 		log.Println("Kesalahan selama pembaruan:", errService)

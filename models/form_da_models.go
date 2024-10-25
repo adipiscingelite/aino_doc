@@ -6,7 +6,7 @@ import (
 )
 
 type DampakAnalisa struct {
-	//NamaProyek                           string    `json:"nama_proyek"`
+	// ProjectUUID                          string `json:"project_uuid"`
 	FormITCMID                           string `json:"itcm_form_uuid"`
 	NamaAnalis                           string `json:"nama_analis"`
 	Jabatan                              string `json:"jabatan"`
@@ -33,6 +33,7 @@ type Formss struct {
 	UpdatedAt                            sql.NullTime   `json:"updated_at" db:"updated_at"`
 	DeletedBy                            sql.NullString `json:"deleted_by" db:"deleted_by"`
 	DeletedAt                            sql.NullTime   `json:"deleted_at" db:"deleted_at"`
+	ITCMFormUUID                         string         `json:"itcm_form_uuid" db:"itcm_form_uuid"`
 	NamaAnalis                           string         `json:"nama_analis" db:"nama_analis"`
 	Jabatan                              string         `json:"jabatan" db:"jabatan"`
 	Departemen                           string         `json:"departemen" db:"departemen"`

@@ -21,6 +21,16 @@ type FormHA struct {
 	Deleted_at   sql.NullTime   `json:"deleted_at" db:"deleted_at"`
 }
 
+type AddInfoHAReq struct {
+	UUID string `json:"form_uuid" db:"form_uuid"`
+	// Name     string `json:"name" db:"name"`
+	NamaPengguna string `json:"nama_pengguna" db:"nama_pengguna"`
+	RuangLingkup string `json:"ruang_lingkup" db:"ruang_lingkup"`
+	JangkaWaktu  string `json:"jangka_waktu" db:"jangka_waktu"`
+	// Password string `json:"password" db:"password"`
+	// Scope    string `json:"scope" db:"scope"`
+}
+
 type AddInfoHA struct {
 	UUID     string `json:"form_uuid" db:"form_uuid"`
 	Name     string `json:"name" db:"name"`
@@ -29,6 +39,27 @@ type AddInfoHA struct {
 	Username string `json:"username" db:"username"`
 	Password string `json:"password" db:"password"`
 	Scope    string `json:"scope" db:"scope"`
+}
+
+type FormsHAReq struct {
+	FormUUID       string         `json:"form_uuid" db:"form_uuid"`
+	FormNumber     string         `json:"form_number" db:"form_number"`
+	FormTicket     string         `json:"form_ticket" db:"form_ticket"`
+	DocumentName   string         `json:"document_name" db:"document_name"`
+	NamaTim        string         `json:"nama_tim" db:"nama_tim"`
+	ProductManager string         `json:"product_manager" db:"product_manager"`
+	NamaPengusul   string         `json:"nama_pengusul" db:"nama_pengusul"`
+	TanggalUsul    string         `json:"tanggal_usul" db:"tanggal_usul"`
+	FormType       string         `json:"form_type" db:"form_type"`
+	FormStatus     string         `json:"form_status" db:"form_status"`
+	CreatedBy      string         `json:"created_by" db:"created_by"`
+	CreatedAt      time.Time      `json:"created_at" db:"created_at"`
+	UpdatedBy      sql.NullString `json:"updated_by" db:"updated_by"`
+	UpdatedAt      sql.NullTime   `json:"updated_at" db:"updated_at"`
+	DeletedBy      sql.NullString `json:"deleted_by" db:"deleted_by"`
+	DeletedAt      sql.NullTime   `json:"deleted_at" db:"deleted_at"`
+	ApprovalStatus string         `json:"approval_status" db:"approval_status"`
+	Reason         sql.NullString `json:"reason" db:"reason"` // tambahkan field ini
 }
 
 type FormsHA struct {
@@ -48,9 +79,19 @@ type FormsHA struct {
 	Reason         sql.NullString `json:"reason" db:"reason"` // tambahkan field ini
 }
 
+type HAReq struct {
+	// FormName       string `json:"form_name" db:"form_name"`
+	NamaTim        string `json:"nama_tim" db:"nama_tim"`
+	ProductManager string `json:"product_manager" db:"product_manager"`
+	NamaPengusul   string `json:"nama_pengusul" db:"nama_pengusul"`
+	TanggalUsul    string `json:"tanggal_usul" db:"tanggal_usul"`
+	FormType       string `json:"form_type" db:"form_type"`
+}
+
 type HA struct {
 	FormName string `json:"form_name" db:"form_name"`
-}	
+	FormType string `json:"form_type" db:"form_type"`
+}
 type FormsHAAll struct {
 	FormUUID      string         `json:"form_uuid" db:"form_uuid"`
 	FormStatus    string         `json:"form_status" db:"form_status"`
@@ -84,4 +125,11 @@ type HakAksesInfo struct {
 	Username string `json:"username" db:"username"`
 	Password string `json:"password" db:"password"`
 	Scope    string `json:"scope" db:"scope"`
+}
+
+type HakAksesRequest struct {
+	HAUUID       string `json:"ha_uuid" db:"ha_uuid"`
+	NamaPengguna string `json:"nama_pengguna" db:"nama_pengguna"`
+	RuangLingkup string `json:"ruang_lingkup" db:"ruang_lingkup"`
+	JangkaWaktu  string `json:"jangka_waktu" db:"jangka_waktu"`
 }

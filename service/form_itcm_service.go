@@ -490,7 +490,12 @@ func GetSpecAllITCM(id string) (*FormITCMWithSignatories, error) {
             name AS signatory_name,
             position AS signatory_position,
             role_sign,
-            is_sign
+            is_sign,
+						CASE
+							WHEN sign_img IS NOT NULL AND sign_img != '' THEN CONCAT('/assets/images/signatures/', sign_img)
+							ELSE ''
+						END AS sign_img,
+						updated_at
         FROM
             sign_form
         WHERE
@@ -607,9 +612,10 @@ f.deleted_at,
 func UpdateFormITCM(updateITCM models.Form, data models.ITCM, username string, userID int, isPublished bool, id string, signatories []models.Signatory) (models.Form, error) {
 	currentTime := time.Now()
 	formStatus := "Draft"
-	if isPublished {
-		formStatus = "Published"
-	}
+	// if isPublished {
+	// 	formStatus = "Published"
+	// }
+	fmt.Println("service")
 
 	var projectID int64
 	err := db.Get(&projectID, "SELECT project_id FROM project_ms WHERE project_uuid = $1", updateITCM.ProjectUUID)
@@ -625,11 +631,12 @@ func UpdateFormITCM(updateITCM models.Form, data models.ITCM, username string, u
 	}
 	log.Println("ITCM JSON:", string(daJSON))
 
-	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id, form_ticket = :form_ticket, form_status = :form_status, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id AND form_status = 'Draft'", map[string]interface{}{
+	_, err = db.NamedExec("UPDATE form_ms SET user_id = :user_id, form_ticket = :form_ticket, form_status = :form_status, is_approve = :is_approve, form_data = :form_data, updated_by = :updated_by, updated_at = :updated_at WHERE form_uuid = :id", map[string]interface{}{
 		"user_id":     userID,
 		"form_ticket": updateITCM.FormTicket,
 		"project_id":  projectID,
 		"form_status": formStatus,
+		"is_approve": nil,
 		"form_data":   daJSON,
 		"updated_by":  username,
 		"updated_at":  currentTime,
@@ -807,6 +814,7 @@ func FormITCMByDivision(divisionCode string) ([]models.FormsITCM, error) {
 		project_ms p ON f.project_id = p.project_id
 	WHERE
 		d.document_code = 'ITCM' AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
+		ORDER BY f.form_number DESC;
 	`, divisionCode)
 
 	if errSelect != nil {
@@ -852,6 +860,7 @@ func SignatureUserITCM(userID int) ([]models.FormsITCM, error) {
 		sign_form sf ON f.form_id = sf.form_id
 	WHERE
 			sf.user_id = $1 AND d.document_code = 'ITCM' AND f.deleted_at IS NULL
+		ORDER BY f.form_number DESC;
 			`, userID)
 	var forms []models.FormsITCM
 	//rows, err := db.Query(&forms, query, userID)

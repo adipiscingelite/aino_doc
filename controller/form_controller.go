@@ -283,25 +283,24 @@ func FormByDivision(c echo.Context) error {
 			"status":  false,
 		})
 	}
-	
+
 	userID, ok := c.Get("user_id").(int)
 	if !ok {
-			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-					"code":    401,
-					"message": "User ID tidak ditemukan!",
-					"status":  false,
-			})
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "User ID tidak ditemukan!",
+			"status":  false,
+		})
 	}
-	
+
 	divisionCode, ok := c.Get("division_code").(string)
 	if !ok {
-			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-					"code":    401,
-					"message": "Division Code tidak ditemukan!",
-					"status":  false,
-			})
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+			"code":    401,
+			"message": "Division Code tidak ditemukan!",
+			"status":  false,
+		})
 	}
-	
 
 	fmt.Println("User ID :", userID)
 	fmt.Println("Division Code :", divisionCode)
@@ -365,6 +364,8 @@ func UpdateForm(c echo.Context) error {
 		IsPublished bool        `json:"isPublished"`
 		FormData    models.Form `json:"formData"`
 	}
+
+	fmt.Println("plis", updateFormRequest)
 
 	if err := c.Bind(&updateFormRequest); err != nil {
 		log.Print("error saat binding:", err)
