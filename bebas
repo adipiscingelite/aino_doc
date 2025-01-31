@@ -1,0 +1,578 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 16.3
+-- Dumped by pg_dump version 16.3
+
+-- Started on 2025-01-31 15:09:14
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 4868 (class 1262 OID 16827)
+-- Name: db_aino_doc; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE db_aino_doc WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'English_Indonesia.1252';
+
+
+ALTER DATABASE db_aino_doc OWNER TO postgres;
+
+\connect db_aino_doc
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 867 (class 1247 OID 17037)
+-- Name: gender; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.gender AS ENUM (
+    'Laki-laki',
+    'Perempuan'
+);
+
+
+ALTER TYPE public.gender OWNER TO postgres;
+
+--
+-- TOC entry 215 (class 1259 OID 16942)
+-- Name: application_order_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.application_order_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.application_order_seq OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 221 (class 1259 OID 16983)
+-- Name: application_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.application_ms (
+    application_id bigint NOT NULL,
+    application_uuid character varying(128) NOT NULL,
+    application_code character varying(20) NOT NULL,
+    application_title character varying(100) NOT NULL,
+    application_description text,
+    application_order integer DEFAULT nextval('public.application_order_seq'::regclass),
+    application_show boolean DEFAULT true NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    updated_at timestamp(0) without time zone,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.application_ms OWNER TO postgres;
+
+--
+-- TOC entry 222 (class 1259 OID 16995)
+-- Name: application_role_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.application_role_ms (
+    application_role_id bigint NOT NULL,
+    application_role_uuid character varying(128) NOT NULL,
+    application_id bigint NOT NULL,
+    role_id bigint NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    updated_at timestamp(0) without time zone,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.application_role_ms OWNER TO postgres;
+
+--
+-- TOC entry 216 (class 1259 OID 16944)
+-- Name: division_order_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.division_order_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.division_order_seq OWNER TO postgres;
+
+--
+-- TOC entry 220 (class 1259 OID 16971)
+-- Name: division_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.division_ms (
+    division_id bigint NOT NULL,
+    division_uuid character varying(128) NOT NULL,
+    division_code character varying(10) NOT NULL,
+    division_title character varying(100) NOT NULL,
+    division_order integer DEFAULT nextval('public.division_order_seq'::regclass),
+    division_show boolean DEFAULT true NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    updated_at timestamp(0) without time zone,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.division_ms OWNER TO postgres;
+
+--
+-- TOC entry 224 (class 1259 OID 17041)
+-- Name: personal_data_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.personal_data_ms (
+    personal_id bigint NOT NULL,
+    personal_uuid character varying(128) NOT NULL,
+    user_id bigint NOT NULL,
+    division_id bigint NOT NULL,
+    personal_name character varying(128) NOT NULL,
+    personal_birthday date NOT NULL,
+    personal_gender public.gender NOT NULL,
+    personal_phone character varying(20) NOT NULL,
+    personal_address text NOT NULL
+);
+
+
+ALTER TABLE public.personal_data_ms OWNER TO postgres;
+
+--
+-- TOC entry 218 (class 1259 OID 16958)
+-- Name: role_order_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.role_order_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.role_order_seq OWNER TO postgres;
+
+--
+-- TOC entry 219 (class 1259 OID 16959)
+-- Name: role_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.role_ms (
+    role_id bigint NOT NULL,
+    role_uuid character varying(128) NOT NULL,
+    role_code character varying(10) NOT NULL,
+    role_title character varying(100) NOT NULL,
+    role_order integer DEFAULT nextval('public.role_order_seq'::regclass),
+    role_show boolean DEFAULT true NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    updated_at timestamp(0) without time zone,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.role_ms OWNER TO postgres;
+
+--
+-- TOC entry 223 (class 1259 OID 17013)
+-- Name: user_application_role_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_application_role_ms (
+    user_application_role_uuid character varying(128) NOT NULL,
+    user_id bigint NOT NULL,
+    application_role_id bigint NOT NULL,
+    division_id bigint NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    updated_at timestamp(0) without time zone,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.user_application_role_ms OWNER TO postgres;
+
+--
+-- TOC entry 217 (class 1259 OID 16945)
+-- Name: user_ms; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_ms (
+    user_id bigint NOT NULL,
+    user_uuid character varying(128) NOT NULL,
+    user_email character varying(100) NOT NULL,
+    user_password character varying(100) NOT NULL,
+    user_name character varying(200) NOT NULL,
+    created_by character varying(100) NOT NULL,
+    created_at timestamp(0) without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp(0) without time zone,
+    updated_by character varying(100) DEFAULT ''::character varying,
+    deleted_by character varying(100) DEFAULT ''::character varying,
+    deleted_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.user_ms OWNER TO postgres;
+
+--
+-- TOC entry 4859 (class 0 OID 16983)
+-- Dependencies: 221
+-- Data for Name: application_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.application_ms (application_id, application_uuid, application_code, application_title, application_description, application_order, application_show, created_by, created_at, updated_by, updated_at, deleted_by, deleted_at) FROM stdin;
+1703044750270924	46849da8-a5bb-4b53-921a-05f6d8465154	Berita Acara	BA	Formulir untuk berita acara	1	t	dewi	2024-07-09 18:45:54		\N		\N
+1720581669429223	9f49739b-38a6-4350-b368-e29850e67d21	APP002	Web	lkmfklm	2	t	Adipiscingelite	2024-07-10 10:15:56		\N		\N
+1721033718475745	3fe087d5-5d48-4796-8109-c47063e9f33f	APP001	Nyoba Woilah	lorem ipsum	3	t	Adipiscingelite	2024-07-15 14:51:01		\N		\N
+1721098332672402	e41a0b95-2bc9-4b43-9fdc-584ca7b010e3	c1	coba 1 edit	p	4	t	Adipiscingelite	2024-07-16 09:19:12	Adipiscingelite	2024-07-16 09:19:33		\N
+1722306939466487	7c61ec4d-3e11-4ca0-88b1-d261789413d7	APP007	aplikasi 7	yg ke 7	5	t	Adipiscingelite	2024-07-30 08:46:16	Adipiscingelite	2024-07-30 08:46:30		\N
+1725248741770830	f04eab56-759e-4bb0-8e49-58baaa6be0f2	p	p	p	6	t	Adipiscingelite	2024-09-02 09:36:31		\N	Adipiscingelite	2024-09-02 09:38:53
+\.
+
+
+--
+-- TOC entry 4860 (class 0 OID 16995)
+-- Dependencies: 222
+-- Data for Name: application_role_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.application_role_ms (application_role_id, application_role_uuid, application_id, role_id, created_by, created_at, updated_by, updated_at, deleted_by, deleted_at) FROM stdin;
+1721025828603559	8b209aa4-c518-49cc-ba1b-2610f6450645	1720581669429223	1720583424768492	Adipiscingelite	2024-07-15 13:37:13	Adipiscingelite	2024-07-15 14:00:04		\N
+1721095962303490	8f9dc41a-5465-4c0d-bb23-5e2a4e888ab9	1720581669429223	20199990	Adipiscingelite	2024-07-16 08:20:53	Adipiscingelite	2024-07-16 09:39:47	Adipiscingelite	2024-07-16 09:39:52
+1722228275817183	3310cb53-741a-4c06-b9f3-827c1d246045	1720581669429223	20199990	Adipiscingelite	2024-07-29 11:37:25		\N		\N
+12132343531	165c3463-1921-43b1-b24b-e69512c45546	1703044750270924	20199991	Ramadhan	2024-07-09 18:49:53		\N		\N
+1720588801760894	fe36b826-c318-4e02-a02e-7129966343c2	1720581669429223	20199990	tes	2024-07-10 11:11:23		\N		\N
+1722310229497492	4e2a61f0-2063-4767-b9a3-e0c8000494c2	1722306939466487	1722309855624942	Adipiscingelite	2024-07-30 10:21:59		\N	Adipiscingelite	2024-07-31 13:38:34
+1724813907741159	1c479355-7210-4889-bd05-8683cad1ec4f	1703044750270924	20199991	Adipiscingelite	2024-08-28 09:18:24		\N		\N
+1724814742138533	09877bc1-d201-40d4-8138-4eb08ee4bed5	1703044750270924	1720583424768492	Adipiscingelite	2024-08-28 09:22:07		\N		\N
+1724812620166021	8f3fff6a-896e-489e-9235-427c6c0f41e6	1703044750270924	20199990	Adipiscingelite	2024-08-28 09:22:57		\N		\N
+1720582650572384	9fa5b151-602d-469f-b1f2-26c0d2b5c060	1703044750270924	1720583424768492	member	2024-07-10 10:17:19	Ramadhan	2024-07-10 10:48:54	Adipiscingelite	2024-07-15 14:01:00
+1724916414879395	cd3fe8d5-db1e-4f1c-a63d-e684c8780151	1703044750270924	1720583424768492	Adipiscingelite	2024-08-29 14:20:39		\N		\N
+1724921695493726	3bb03a5a-cb26-4e53-a761-f93664d3a6ea	1703044750270924	1720583424768492	Adipiscingelite	2024-08-29 15:25:23		\N		\N
+1720586368049268	7fb9931b-6cfd-42e7-a5d9-969fc5e62981	1703044750270924	1720583424768492	product	2024-07-10 10:50:05		\N		\N
+1720581710656991	d5589cc4-7bbf-4c8d-a93f-245041a97631	1703044750270924	20199990	rasidadmin	2024-07-10 10:17:55	Adipiscingelite	2024-07-15 14:01:10		\N
+1725178872861661	ef6bebc7-4585-4754-9814-fffc6bff20d7	1703044750270924	20199990	Adipiscingelite	2024-09-01 15:20:13		\N		\N
+1725182350927561	4598d931-119f-4493-aa6e-0601516f834f	1703044750270924	20199990	Adipiscingelite	2024-09-01 15:21:09		\N	Adipiscingelite	2024-09-02 09:19:24
+1725248225386548	773f6d31-f0bb-4a5f-9790-ebd49f531970	1722306939466487	20199991	Adipiscingelite	2024-09-02 09:44:44		\N	Adipiscingelite	2024-09-02 09:45:06
+1729841886701117	e96a0a09-2997-4b15-888b-a30456cbd872	1703044750270924	1720583424768492	Adipiscingelite	2024-10-25 13:45:59		\N		\N
+\.
+
+
+--
+-- TOC entry 4858 (class 0 OID 16971)
+-- Dependencies: 220
+-- Data for Name: division_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.division_ms (division_id, division_uuid, division_code, division_title, division_order, division_show, created_by, created_at, updated_by, updated_at, deleted_by, deleted_at) FROM stdin;
+1703045007013281	3eeea63f-f3b2-4c67-a488-2a89996a62df	HC	Human Capital	2	t	dewi	2024-07-09 18:45:33		\N		\N
+1720583386717716	c35584d0-a6d3-4286-9857-90994d85f87f	I	Intern	3	t	Adipiscingelite	2024-07-10 10:18:40		\N		\N
+1721030348908233	2f39bd84-c938-4119-82f4-e032735829d5	T	Tamu	4	t	Adipiscingelite	2024-07-15 14:55:25		\N		\N
+1721030256598936	71c49351-7dcf-49a1-8c6c-7465a5abd740	GA	Grand Affair	5	t	Adipiscingelite	2024-07-15 14:57:27		\N		\N
+1724919275108669	35b4eaf4-74bc-49db-90ae-4c55539bfc5a	P	Product	9	t	Adipiscingelite	2024-08-29 14:18:58		\N		\N
+1724918002858274	f706d61d-fa2c-4a11-b496-c8fb3dca3dfa	F	Finance	10	t	Adipiscingelite	2024-08-29 14:19:05		\N		\N
+1724920083890441	725b8ecb-4b58-480a-8b52-c40b89d72a46	L	Legal	11	t	Adipiscingelite	2024-08-29 14:19:26		\N		\N
+1724918449359837	46e386b5-9c8f-48ea-902b-8786df4324e6	OP	Operation	12	t	Adipiscingelite	2024-08-29 14:19:48		\N		\N
+1721032816048839	ade9b656-8ec3-4568-8754-d3c593fc1aaa	w	woilah	6	t	Adipiscingelite	2024-07-15 14:58:47		\N	Adipiscingelite	2024-09-02 09:40:45
+1721098539121137	135a0dae-2a4b-4cb1-a13c-ea05b905e62f	c1	coba 1 edit	7	t	Adipiscingelite	2024-07-16 09:28:48	Adipiscingelite	2024-07-16 09:31:52	Adipiscingelite	2024-09-02 09:40:50
+1722305650661009	7e60685d-ff5e-4f29-8001-8bf5825534cc	testes	tes edit	8	t	Adipiscingelite	2024-07-30 09:06:16	Adipiscingelite	2024-07-30 09:07:41	Adipiscingelite	2024-09-02 09:40:53
+1800000	dc9076e9-2fda-4019-bd2c-900a8284b9c8	HC	Human Captial	1	t	Super Admin	2024-07-09 18:34:19		\N	Adipiscingelite	2024-09-02 09:40:58
+\.
+
+
+--
+-- TOC entry 4862 (class 0 OID 17041)
+-- Dependencies: 224
+-- Data for Name: personal_data_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.personal_data_ms (personal_id, personal_uuid, user_id, division_id, personal_name, personal_birthday, personal_gender, personal_phone, personal_address) FROM stdin;
+1725178872861661	ef6bebc7-4585-4754-9814-fffc6bff20d7	1725178872861661	1724919275108669	product admin	2024-09-01	Laki-laki	0865-1651-26251	gtw
+1725182350927561	4598d931-119f-4493-aa6e-0601516f834f	1725182350927561	1724918002858274	finance admin	2024-09-01	Perempuan	0871-8374-87131	gtw
+1720588801760894	fe36b826-c318-4e02-a02e-7129966343c2	1720588801760894	1721030256598936	Natan wir	2024-07-10	Laki-laki	0856-4149-2633	jakal
+1721025828603559	8b209aa4-c518-49cc-ba1b-2610f6450645	1721025828603559	1721030256598936	member	2024-07-15	Laki-laki	(0791) 3741414	jkal
+1729841886701117	e96a0a09-2997-4b15-888b-a30456cbd872	1729841886701117	1721030256598936	General Affair	2024-10-25	Laki-laki	0871-3465-8872	PT Aino Indonesia, Jalan Acasia, Sinduadi, Mlati, Sleman, Yogyakarta
+1720582650572384	9fa5b151-602d-469f-b1f2-26c0d2b5c060	1720582650572384	1800000	Super Admin	2024-07-10	Laki-laki	0856-7118-712	Jakal
+1720586368049268	7fb9931b-6cfd-42e7-a5d9-969fc5e62981	1720586368049268	1800000	Tamu	2024-07-10	Perempuan	0856-3292-8265	jalan jalan
+1724813907741159	1c479355-7210-4889-bd05-8683cad1ec4f	1724813907741159	1721030348908233	Superadmin	2000-02-01	Laki-laki	0888-0600-3181	JL. Sama aku
+1724814742138533	09877bc1-d201-40d4-8138-4eb08ee4bed5	1724814742138533	1720583386717716	rasid member	2024-08-28	Laki-laki	0881-3648-146	jl
+1724916414879395	cd3fe8d5-db1e-4f1c-a63d-e684c8780151	1724916414879395	1724918002858274	finance user	2024-08-29	Laki-laki	0813-8741-7131	gtw
+1724921695493726	3bb03a5a-cb26-4e53-a761-f93664d3a6ea	1724921695493726	1724919275108669	product user	2024-08-29	Laki-laki	0837-8481-641	gtw
+1724812620166021	8f3fff6a-896e-489e-9235-427c6c0f41e6	1724812620166021	1720583386717716	rasid admin	2024-08-28	Laki-laki	0887-2418-413	jl
+\.
+
+
+--
+-- TOC entry 4857 (class 0 OID 16959)
+-- Dependencies: 219
+-- Data for Name: role_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.role_ms (role_id, role_uuid, role_code, role_title, role_order, role_show, created_by, created_at, updated_by, updated_at, deleted_by, deleted_at) FROM stdin;
+20199991	dc9076e9-2fda-4019-bd2c-900a8284b9c6	SA	Super Admin	2	t	Super Admin	2024-07-09 18:34:14		\N		\N
+20199990	dc9076e9-2fda-4019-bd2c-900a8284b9c5	A	Admin	1	t	Admin	2024-07-09 18:34:14		\N		\N
+1720583424768492	76851179-b7c5-4c22-9d80-7048e67ae482	M	Member	5	t	Adipiscingelite	2024-07-10 10:18:17	Adipiscingelite	2024-07-15 13:36:15		\N
+1722312214485445	b907631a-63c5-4ba3-9a38-e37ac4d33d3a	lagi	lagi	9	t	Adipiscingelite	2024-07-30 09:54:52		\N	Adipiscingelite	2024-09-02 09:43:52
+1722310712075237	10890bcb-c964-4a2d-933f-a45cb28df560	tes lagii	tes lagii	8	t	Adipiscingelite	2024-07-30 09:54:25		\N	Adipiscingelite	2024-09-02 09:43:55
+1722307996235425	df5824e2-f621-479d-aad8-4606eafff26d	tes lagi	tes lagi	7	t	Adipiscingelite	2024-07-30 09:46:48		\N	Adipiscingelite	2024-09-02 09:43:57
+1722309855624942	91021f4e-3662-4d80-bb11-e7ac72782e03	tes	tes	6	t	Adipiscingelite	2024-07-30 09:46:23		\N	Adipiscingelite	2024-09-02 09:44:00
+\.
+
+
+--
+-- TOC entry 4861 (class 0 OID 17013)
+-- Dependencies: 223
+-- Data for Name: user_application_role_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_application_role_ms (user_application_role_uuid, user_id, application_role_id, division_id, created_by, created_at, updated_by, updated_at, deleted_by, deleted_at) FROM stdin;
+9fa5b151-602d-469f-b1f2-26c0d2b5c060	1720582650572384	12132343531	1800000	Adipiscingelite	2024-07-10 10:17:19	Ramadhan	2024-07-29 12:35:38		\N
+7fb9931b-6cfd-42e7-a5d9-969fc5e62981	1720586368049268	1720586368049268	1800000	Ramadhan	2024-07-10 10:50:05	Tamu	2024-07-30 10:46:48		\N
+8f9dc41a-5465-4c0d-bb23-5e2a4e888ab9	1721095962303490	1720581710656991	1721030348908233	Adipiscingelite	2024-07-16 08:20:53	Hijacker	2024-08-01 16:48:01		\N
+1c479355-7210-4889-bd05-8683cad1ec4f	1724813907741159	12132343531	1721030348908233	Adipiscingelite	2024-08-28 09:18:24		\N		\N
+09877bc1-d201-40d4-8138-4eb08ee4bed5	1724814742138533	1720586368049268	1720583386717716	Adipiscingelite	2024-08-28 09:22:07		\N		\N
+fe36b826-c318-4e02-a02e-7129966343c2	1720588801760894	1724812620166021	1721030256598936	Adipiscingelite	2024-07-10 11:11:23	Natan	2024-08-28 09:23:40		\N
+8b209aa4-c518-49cc-ba1b-2610f6450645	1721025828603559	1720586368049268	1721030256598936	Adipiscingelite	2024-07-15 13:37:13	member	2024-08-28 09:23:47		\N
+cd3fe8d5-db1e-4f1c-a63d-e684c8780151	1724916414879395	1724814742138533	1724918002858274	Adipiscingelite	2024-08-29 14:20:39	finance	2024-09-01 15:18:02		\N
+3bb03a5a-cb26-4e53-a761-f93664d3a6ea	1724921695493726	1724814742138533	1724919275108669	Adipiscingelite	2024-08-29 15:25:23	product	2024-09-01 15:18:10		\N
+8f3fff6a-896e-489e-9235-427c6c0f41e6	1724812620166021	1724812620166021	1720583386717716	Adipiscingelite	2024-08-28 09:22:57	rasidadmin	2024-09-01 15:18:29		\N
+ef6bebc7-4585-4754-9814-fffc6bff20d7	1725178872861661	1724812620166021	1724919275108669	Adipiscingelite	2024-09-01 15:20:13		\N		\N
+4598d931-119f-4493-aa6e-0601516f834f	1725182350927561	1724812620166021	1724918002858274	Adipiscingelite	2024-09-01 15:21:09		\N		\N
+e96a0a09-2997-4b15-888b-a30456cbd872	1729841886701117	1724814742138533	1721030256598936	Adipiscingelite	2024-10-25 13:45:59		\N		\N
+\.
+
+
+--
+-- TOC entry 4855 (class 0 OID 16945)
+-- Dependencies: 217
+-- Data for Name: user_ms; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_ms (user_id, user_uuid, user_email, user_password, user_name, created_by, created_at, updated_at, updated_by, deleted_by, deleted_at) FROM stdin;
+1724814742138533	09877bc1-d201-40d4-8138-4eb08ee4bed5	rasmember@gmail.com	JDJhJDEwJFJ2SHhUeGZmME5lbGs0a1cuZmM4b3VyMVJzY0hzcmlDNENxNVh2a2dmcDdoWmFoQUZLdG5L	rasidmember	Adipiscingelite	2024-08-28 09:22:07	\N			\N
+1720588801760894	fe36b826-c318-4e02-a02e-7129966343c2	natan@gmail.com	JDJhJDEwJDQ2Znd3Qi8xbTFrQWpJNWZQZHdwdk95eS9ydVhLVy9XQW9FSGo4S2syMzFTWEJETVdQLkw2	Natan	Adipiscingelite	2024-07-10 11:11:23	2024-08-28 09:23:40	Natan		\N
+1721025828603559	8b209aa4-c518-49cc-ba1b-2610f6450645	member@gmail.com	JDJhJDEwJGRvRWFlMGZ5eGNZSXF0eWhaSGl2b2VNYTZGdzlqWFRLNS40aC5VUEJmL2g3dDVJeWZpTjBL	member	Adipiscingelite	2024-07-15 13:37:13	2024-08-28 09:23:47	member		\N
+1724813907741159	1c479355-7210-4889-bd05-8683cad1ec4f	syaiful@gmail.com	JDJhJDEwJFduazZlSE9SekVwNXZuZmxjNUhEY094d3czM3d6eXhMZDlaSndoODhORldMLno0U0tyamJl	Adipiscingelite	Adipiscingelite	2024-08-28 09:18:24	\N			\N
+1720586368049268	7fb9931b-6cfd-42e7-a5d9-969fc5e62981	tamu@gmail.com	JDJhJDEwJFduazZlSE9SekVwNXZuZmxjNUhEY094d3czM3d6eXhMZDlaSndoODhORldMLno0U0tyamJl	Tamu	Ramadhan	2024-07-10 10:50:05	2024-07-30 10:46:48	Tamu		\N
+1720582650572384	9fa5b151-602d-469f-b1f2-26c0d2b5c060	superadmin@gmail.com	JDJhJDEwJDFIZUU4bW0zTklWOVA4bDh2dW52OGU2TzBEeTI4dUhPSEpWTWkxcy82V2hwZFhpYlhFbUpD	Ramadhan	Adipiscingelite	2024-07-10 10:17:19	2024-07-29 12:35:38	Ramadhan		\N
+1724916414879395	cd3fe8d5-db1e-4f1c-a63d-e684c8780151	financeuser@gmail.com	JDJhJDEwJHJIQTNEaVFmZGZkTHZrblBwNE8zVC5Ib242a0lWbS9KQkUuVG93RXVUMDhFTWd6dEZ6di9P	finance user	Adipiscingelite	2024-08-29 14:20:39	2024-09-01 15:18:02	finance		\N
+1724921695493726	3bb03a5a-cb26-4e53-a761-f93664d3a6ea	productuser@gmail.com	JDJhJDEwJFZnRGZtbEpLeGM5eDJnMFdPcDNlQy4uRmE1UjJXMWI0UnV0Y3gvUmdoL1I3UFBxaVk3Nk1H	product user	Adipiscingelite	2024-08-29 15:25:23	2024-09-01 15:18:10	product		\N
+1724812620166021	8f3fff6a-896e-489e-9235-427c6c0f41e6	rasadmin@gmail.com	JDJhJDEwJFduazZlSE9SekVwNXZuZmxjNUhEY094d3czM3d6eXhMZDlaSndoODhORldMLno0U0tyamJl	rasidadmin	Adipiscingelite	2024-08-28 09:22:57	2024-09-01 15:18:29	rasidadmin		\N
+1725178872861661	ef6bebc7-4585-4754-9814-fffc6bff20d7	productadmin@gmail.com	JDJhJDEwJC84Nk1ScVN0MkhHRFFWT1FyRS80SWVsMGdkNkJxWUZuOU9rNnZKWS5zUVE0dlplMlZ3eUpT	product admin	Adipiscingelite	2024-09-01 15:20:13	\N			\N
+1725182350927561	4598d931-119f-4493-aa6e-0601516f834f	financeadmin@gmail.com	JDJhJDEwJEpNQlE4b25YU3Budll6WWxGeVJ3Uy5oY3lIbm5DazhNWlovcmM0R2syNWlqNHhuRFkxb3Ay	finance admin	Adipiscingelite	2024-09-01 15:21:09	\N			\N
+1729841886701117	e96a0a09-2997-4b15-888b-a30456cbd872	ga@gmail.com	JDJhJDEwJFpWa21FdVltMVlqZkRzZGR4WFRCUE9yVVp5S0tTU3hjMUM5NXZ6MkFkb09YcXJzTklEakl5	ga	Adipiscingelite	2024-10-25 13:45:59	\N			\N
+1721095962303490	8f9dc41a-5465-4c0d-bb23-5e2a4e888ab9	rasit@gmail.com	JDJhJDEwJHBnUkFuLmRJNzJaODNzTTl3UkpBQXUzd3NpTlJoT1B4L1RQWHE5MzJVQnROcXQxS3dEWXE2	Hijacker	Adipiscingelite	2024-07-16 08:20:53	2024-08-01 16:48:01	Hijacker		\N
+\.
+
+
+--
+-- TOC entry 4869 (class 0 OID 0)
+-- Dependencies: 215
+-- Name: application_order_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.application_order_seq', 6, true);
+
+
+--
+-- TOC entry 4870 (class 0 OID 0)
+-- Dependencies: 216
+-- Name: division_order_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.division_order_seq', 12, true);
+
+
+--
+-- TOC entry 4871 (class 0 OID 0)
+-- Dependencies: 218
+-- Name: role_order_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.role_order_seq', 9, true);
+
+
+--
+-- TOC entry 4696 (class 2606 OID 16994)
+-- Name: application_ms application_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.application_ms
+    ADD CONSTRAINT application_ms_pkey PRIMARY KEY (application_id);
+
+
+--
+-- TOC entry 4698 (class 2606 OID 17002)
+-- Name: application_role_ms application_role_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.application_role_ms
+    ADD CONSTRAINT application_role_ms_pkey PRIMARY KEY (application_role_id);
+
+
+--
+-- TOC entry 4694 (class 2606 OID 16982)
+-- Name: division_ms division_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.division_ms
+    ADD CONSTRAINT division_ms_pkey PRIMARY KEY (division_id);
+
+
+--
+-- TOC entry 4702 (class 2606 OID 17047)
+-- Name: personal_data_ms personal_data_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_data_ms
+    ADD CONSTRAINT personal_data_ms_pkey PRIMARY KEY (personal_id);
+
+
+--
+-- TOC entry 4690 (class 2606 OID 16970)
+-- Name: role_ms role_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.role_ms
+    ADD CONSTRAINT role_ms_pkey PRIMARY KEY (role_id);
+
+
+--
+-- TOC entry 4692 (class 2606 OID 17194)
+-- Name: role_ms role_ms_role_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.role_ms
+    ADD CONSTRAINT role_ms_role_code_key UNIQUE (role_code);
+
+
+--
+-- TOC entry 4700 (class 2606 OID 17020)
+-- Name: user_application_role_ms user_application_role_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_application_role_ms
+    ADD CONSTRAINT user_application_role_ms_pkey PRIMARY KEY (user_id, application_role_id, division_id);
+
+
+--
+-- TOC entry 4688 (class 2606 OID 16954)
+-- Name: user_ms user_ms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_ms
+    ADD CONSTRAINT user_ms_pkey PRIMARY KEY (user_id);
+
+
+--
+-- TOC entry 4703 (class 2606 OID 17003)
+-- Name: application_role_ms application_role_ms_application_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.application_role_ms
+    ADD CONSTRAINT application_role_ms_application_id_fkey FOREIGN KEY (application_id) REFERENCES public.application_ms(application_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4704 (class 2606 OID 17008)
+-- Name: application_role_ms application_role_ms_role_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.application_role_ms
+    ADD CONSTRAINT application_role_ms_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.role_ms(role_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4708 (class 2606 OID 17053)
+-- Name: personal_data_ms personal_data_ms_division_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_data_ms
+    ADD CONSTRAINT personal_data_ms_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.division_ms(division_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4709 (class 2606 OID 17048)
+-- Name: personal_data_ms personal_data_ms_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_data_ms
+    ADD CONSTRAINT personal_data_ms_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_ms(user_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4705 (class 2606 OID 17026)
+-- Name: user_application_role_ms user_application_role_ms_application_role_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_application_role_ms
+    ADD CONSTRAINT user_application_role_ms_application_role_id_fkey FOREIGN KEY (application_role_id) REFERENCES public.application_role_ms(application_role_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4706 (class 2606 OID 17031)
+-- Name: user_application_role_ms user_application_role_ms_division_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_application_role_ms
+    ADD CONSTRAINT user_application_role_ms_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.division_ms(division_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4707 (class 2606 OID 17021)
+-- Name: user_application_role_ms user_application_role_ms_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_application_role_ms
+    ADD CONSTRAINT user_application_role_ms_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_ms(user_id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+-- Completed on 2025-01-31 15:09:14
+
+--
+-- PostgreSQL database dump complete
+--
+
