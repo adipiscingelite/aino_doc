@@ -23,6 +23,6 @@ func main() {
 	e.Validator = customValidator
 
 	// Start the server
-	e.Logger.Fatal(e.Start("192.168.110.9:1234"))
-	// e.Logger.Fatal(e.Start("192.168.110.9:1234"))
+	e.Logger.Fatal(e.Start(":1234"))
+	// e.Logger.Fatal(e.Start(":1234"))
 }

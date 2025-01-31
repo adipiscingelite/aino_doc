@@ -86,6 +86,7 @@ func AddITCM(addForm models.Form, itcm models.ITCM, isPublished bool, userID int
 		formStatus = "Published"
 	}
 
+	fmt.Println("doc uuid", addForm.DocumentUUID)
 	var documentID int64
 	err := db.Get(&documentID, "SELECT document_id FROM document_ms WHERE document_uuid = $1", addForm.DocumentUUID)
 	if err != nil {
@@ -276,6 +277,7 @@ func GetAllITCMbyUserID(userID int) ([]models.FormsITCM, error) {
 			project_ms p ON f.project_id = p.project_id
 		WHERE
 			f.user_id = $1 AND d.document_code = 'ITCM' AND f.deleted_at IS NULL
+		ORDER BY f.form_number DESC;
 			`, userID)
 	var forms []models.FormsITCM
 	//rows, err := db.Query(&forms, query, userID)
@@ -636,7 +638,7 @@ func UpdateFormITCM(updateITCM models.Form, data models.ITCM, username string, u
 		"form_ticket": updateITCM.FormTicket,
 		"project_id":  projectID,
 		"form_status": formStatus,
-		"is_approve": nil,
+		"is_approve":  nil,
 		"form_data":   daJSON,
 		"updated_by":  username,
 		"updated_at":  currentTime,

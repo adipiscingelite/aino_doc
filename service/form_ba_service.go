@@ -680,6 +680,7 @@ func GetAllBAbyUserID(userID int) ([]models.FormsBA, error) {
 	// Slice to hold all form data
 	var forms []models.FormsBA
 
+	fmt.Println("scan woi")
 	// Iterate through the rows
 	for rows.Next() {
 		// Scan the row into the Forms struct
@@ -737,7 +738,7 @@ func GetAllBAbyAdmin() ([]models.FormsBA, error) {
 		LEFT JOIN 
 			project_ms p ON f.project_id = p.project_id
 			WHERE
-			d.document_code = 'BA' AND f.deleted_at IS NULL
+			d.document_code = 'BA' AND f.deleted_at IS NULL AND f.project_id IS NOT NULL ORDER BY f.form_number DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -1218,7 +1219,7 @@ func FormBAByDivision(divisionCode string) ([]models.FormsBA, error) {
 		LEFT JOIN 
 			project_ms p ON f.project_id = p.project_id
 			WHERE
-			d.document_code = 'BA' AND f.deleted_at IS NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
+			d.document_code = 'BA' AND f.deleted_at IS NULL AND f.project_id IS NOT NULL AND SPLIT_PART(f.form_number, '/', 2) = $1
 		ORDER BY f.form_number DESC;
 	`, divisionCode)
 
